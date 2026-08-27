@@ -292,6 +292,7 @@ h1, h2, h3, p { margin: 0; }
 .cal-dot { width: 6px; height: 6px; border-radius: 50%; }
 .cal-dot.diamond { border-radius: 1.5px; transform: rotate(45deg); }
 .cal-dot.done { opacity: .35; }
+.cal-dot.ev { background: transparent; border: 1.5px solid var(--text-3); }
 .cal-more { font-size: 9px; color: var(--text-3); line-height: 6px; }
 .cal-pills { display: none; }
 @media (min-width: 900px) {
@@ -302,6 +303,7 @@ h1, h2, h3, p { margin: 0; }
   .cal-pills { display: flex; flex-direction: column; gap: 3px; }
   .cal-pill { font-size: 11px; font-weight: 500; line-height: 1.35; padding: 2px 7px; border-radius: 5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
   .cal-pill.done { opacity: .5; text-decoration: line-through; }
+  .cal-pill-ev { background: transparent; border: 1px solid var(--border); color: var(--text-2); font-variant-numeric: tabular-nums; }
   .cal-pill-more { font-size: 10.5px; color: var(--text-3); padding: 0 7px; text-align: left; }
 }
 .cal-empty-note { text-align: center; font-size: 12.5px; color: var(--text-3); margin-top: 14px; }
@@ -439,6 +441,26 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .welcome-step .t { flex: 1; font-weight: 500; }
 .welcome-step .btn-ghost { min-height: 34px; font-size: 12.5px; padding: 0 12px; }
 
+/* formatting toolbar + attachments */
+.md-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+.md-tools button { min-width: 34px; min-height: 30px; border-radius: 6px; background: var(--surface-2); font-size: 13px; color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; }
+.md-tools button:hover { background: var(--surface-3); color: var(--text); }
+.md-tools button svg { width: 16px; height: 16px; }
+.att-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.att-thumb { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); padding: 0; display: inline-flex; }
+.att-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.att-thumb.att-missing::after { content: "…"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.att-x { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background: rgb(10 10 16 / .55); color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.att-add { width: 72px; height: 72px; border-radius: 8px; border: 1.5px dashed var(--border); color: var(--text-3); display: inline-flex; align-items: center; justify-content: center; }
+.att-add:hover { color: var(--text-2); border-color: var(--text-3); }
+.att-add svg { width: 22px; height: 22px; }
+.summary-preview { white-space: pre-wrap; }
+.lightbox { text-align: center; }
+.lightbox img { max-width: 100%; max-height: 60dvh; border-radius: 10px; background: var(--surface-2); min-height: 80px; }
+
+/* external calendar events */
+.ev-time { font-size: 11.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 78px; }
+
 /* misc */
 .hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
 .home-col { display: flex; flex-direction: column; min-width: 0; }
@@ -464,6 +486,7 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 </div>
 <div id="sheet-root"></div>
 <div id="toast-root"></div>
+<input type="file" id="att-file" accept="image/*" style="display:none" aria-hidden="true" tabindex="-1">
 
 <script id="seed-data" type="application/json">{"schemaVersion":1,"meta":{"seq":0,"lastSavedAt":null,"lastSavedBy":null,"createdAt":null},"settings":{},"courses":[],"tasks":[],"recurringTemplates":[],"weeklySummaries":{},"habits":[],"habitLog":{},"history":{}}</script>
 
@@ -550,9 +573,11 @@ function nowIso() { return new Date().toISOString(); }
 /* ============================================================
    store — state, dispatch funnel, normalize/migrate, queries
    ============================================================ */
-const CURRENT_SCHEMA = 1;
+const CURRENT_SCHEMA = 2;
 const CATS = ["study", "work", "personal"];
 const CAT_LABEL = { study: "Study", work: "Work", personal: "Personal" };
+const GROUP_NOUN = { study: "course", work: "project" };
+const GROUP_NOUN_PLURAL = { study: "Courses", work: "Projects" };
 
 let S = null;          // persisted document
 let rev = 0;           // bumped on every mutation
@@ -565,7 +590,7 @@ function emptyState() {
     meta: { seq: 0, lastSavedAt: null, lastSavedBy: null, createdAt: nowIso() },
     settings: {},
     courses: [], tasks: [], recurringTemplates: [],
-    weeklySummaries: {}, habits: [], habitLog: {}, history: {},
+    weeklySummaries: {}, habits: [], habitLog: {}, history: {}, attachments: {},
   };
 }
 function normalize(d) {
@@ -575,6 +600,7 @@ function normalize(d) {
   d.courses = (Array.isArray(d.courses) ? d.courses : []).filter(c => c && c.id);
   for (const c of d.courses) {
     c.name = String(c.name ?? "Course"); c.colorIndex = Number.isInteger(c.colorIndex) ? ((c.colorIndex % 12) + 12) % 12 : 0;
+    c.category = c.category === "work" ? "work" : "study";
     c.archived = !!c.archived; c.sortOrder = typeof c.sortOrder === "number" ? c.sortOrder : 100;
     c.createdAt = c.createdAt || nowIso(); c.updatedAt = c.updatedAt || c.createdAt;
   }
@@ -582,8 +608,10 @@ function normalize(d) {
   for (const t of d.tasks) {
     t.title = String(t.title ?? "");
     if (!CATS.includes(t.category)) t.category = "personal";
-    t.courseId = t.category === "study" ? (t.courseId || null) : null;
+    t.courseId = (t.category === "study" || t.category === "work") ? (t.courseId || null) : null;
     t.label = t.label || null;
+    if (Array.isArray(t.images) && t.images.length) t.images = t.images.filter(x => typeof x === "string");
+    if (!Array.isArray(t.images) || !t.images.length) delete t.images;
     t.dueDate = /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate || "") ? t.dueDate : null;
     if (t.dueDate && isNaN(parseDateKey(t.dueDate).getTime())) t.dueDate = null;
     if (t.dueDate) t.weekKey = weekKeyOf(parseDateKey(t.dueDate));
@@ -598,7 +626,7 @@ function normalize(d) {
   d.recurringTemplates = (Array.isArray(d.recurringTemplates) ? d.recurringTemplates : []).filter(r => r && r.id);
   for (const r of d.recurringTemplates) {
     r.title = String(r.title ?? ""); if (!CATS.includes(r.category)) r.category = "work";
-    r.courseId = r.category === "study" ? (r.courseId || null) : null;
+    r.courseId = (r.category === "study" || r.category === "work") ? (r.courseId || null) : null;
     r.label = r.label || null; r.notes = String(r.notes ?? "");
     if (!parseWeekKey(r.fromWeek || "")) r.fromWeek = currentWeekKey();
     r.untilWeek = parseWeekKey(r.untilWeek || "") ? r.untilWeek : null;
@@ -606,7 +634,33 @@ function normalize(d) {
     r.archived = !!r.archived; r.sortOrder = typeof r.sortOrder === "number" ? r.sortOrder : 100;
     r.createdAt = r.createdAt || nowIso(); r.updatedAt = r.updatedAt || r.createdAt;
   }
-  if (typeof d.weeklySummaries !== "object" || Array.isArray(d.weeklySummaries)) d.weeklySummaries = {};
+  if (typeof d.weeklySummaries !== "object" || d.weeklySummaries === null || Array.isArray(d.weeklySummaries)) d.weeklySummaries = {};
+  const cleanWS = {};
+  const scanEntry = (entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const e = { text: String(entry.text ?? ""), updatedAt: entry.updatedAt || nowIso() };
+    const ims = Array.isArray(entry.images) ? entry.images.filter(x => typeof x === "string") : [];
+    if (ims.length) e.images = ims;
+    return (e.text.trim() || e.images) ? e : null;
+  };
+  for (const [wk, w] of Object.entries(d.weeklySummaries)) {
+    if (!parseWeekKey(wk) || !w || typeof w !== "object") continue;
+    const nw = { courses: {} };
+    if (w.courses && typeof w.courses === "object" && !Array.isArray(w.courses)) {
+      for (const [cid, entry] of Object.entries(w.courses)) { const e = scanEntry(entry); if (e) nw.courses[cid] = e; }
+    }
+    for (const s of ["work", "personal"]) { const e = scanEntry(w[s]); if (e) nw[s] = e; }
+    if (Object.keys(nw.courses).length || nw.work || nw.personal) cleanWS[wk] = nw;
+  }
+  d.weeklySummaries = cleanWS;
+  if (typeof d.attachments !== "object" || d.attachments === null || Array.isArray(d.attachments)) d.attachments = {};
+  const cleanAtt = {};
+  for (const [id, m] of Object.entries(d.attachments)) {
+    if (!m || typeof m !== "object" || typeof m.path !== "string") continue;
+    cleanAtt[id] = { path: m.path, sha: typeof m.sha === "string" ? m.sha : null,
+      w: Number(m.w) || 0, h: Number(m.h) || 0, bytes: Number(m.bytes) || 0, createdAt: m.createdAt || nowIso() };
+  }
+  d.attachments = cleanAtt;
   d.habits = (Array.isArray(d.habits) ? d.habits : []).filter(h => h && h.id);
   for (const h of d.habits) {
     h.kind = h.kind === "weekly" ? "weekly" : "daily";
@@ -633,7 +687,12 @@ function normalize(d) {
   if (typeof d.history !== "object" || Array.isArray(d.history)) d.history = {};
   return d;
 }
-const MIGRATIONS = { /* 1: (d) => { ...to v2...; d.schemaVersion = 2; } */ };
+const MIGRATIONS = {
+  1: (d) => { // v2: courses become category-scoped groups (study courses / work projects)
+    for (const c of (Array.isArray(d.courses) ? d.courses : [])) if (c && typeof c === "object" && !c.category) c.category = "study";
+    d.schemaVersion = 2;
+  },
+};
 function migrate(d) {
   if (typeof d.schemaVersion !== "number") throw new Error("invalid_data");
   if (d.schemaVersion > CURRENT_SCHEMA) { futureVersion = true; return normalize(d); }
@@ -698,13 +757,51 @@ function apply(op) {
     case "summary.set": {
       const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
       w.courses ||= {};
-      const entry = { text: op.text, updatedAt: nowIso() };
-      if (op.scope === "work" || op.scope === "personal") {
-        if (op.text.trim()) w[op.scope] = entry; else delete w[op.scope];
-      } else {
-        if (op.text.trim()) w.courses[op.scope] = entry; else delete w.courses[op.scope];
+      const text = String(op.text ?? "");
+      const isTop = op.scope === "work" || op.scope === "personal";
+      const prev = isTop ? w[op.scope] : w.courses[op.scope];
+      const images = prev && prev.images ? prev.images : null;
+      let entry = null;
+      if (text.trim() || images) {
+        entry = { text, updatedAt: nowIso() };
+        if (images) entry.images = images;
+      }
+      if (isTop) { if (entry) w[op.scope] = entry; else delete w[op.scope]; }
+      else { if (entry) w.courses[op.scope] = entry; else delete w.courses[op.scope]; }
+      if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[op.weekKey];
+      break;
+    }
+    case "summary.image": {
+      const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
+      w.courses ||= {};
+      const isTop = op.scope === "work" || op.scope === "personal";
+      let entry = isTop ? w[op.scope] : w.courses[op.scope];
+      if (!entry) {
+        entry = { text: "", updatedAt: nowIso() };
+        if (isTop) w[op.scope] = entry; else w.courses[op.scope] = entry;
+      }
+      const ims = (entry.images || []).filter(i => i !== op.id);
+      if (op.add) ims.push(op.id);
+      if (ims.length) entry.images = ims; else delete entry.images;
+      entry.updatedAt = nowIso();
+      if (!String(entry.text || "").trim() && !entry.images) {
+        if (isTop) delete w[op.scope]; else delete w.courses[op.scope];
       }
       if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[op.weekKey];
+      break;
+    }
+    case "att.add": {
+      if (op.id && op.meta && typeof op.meta.path === "string") S.attachments[op.id] = { ...op.meta };
+      break;
+    }
+    case "att.remove": {
+      if (!S.attachments[op.id]) return false;
+      delete S.attachments[op.id];
+      const cached = attUrlCache.get(op.id);
+      if (cached !== undefined) {
+        attUrlCache.delete(op.id);
+        Promise.resolve(cached).then(u => { if (typeof u === "string") URL.revokeObjectURL(u); });
+      }
       break;
     }
     case "habit.upsert": {
@@ -756,7 +853,7 @@ function dispatch(op, opts = {}) {
 /* ---- derived queries ---- */
 function byOrder(a, b) { return (a.sortOrder - b.sortOrder) || String(a.createdAt).localeCompare(String(b.createdAt)); }
 function nextSortOrder(arr) { return arr.reduce((m, x) => Math.max(m, x.sortOrder || 0), 0) + 100; }
-function activeCourses() { return S.courses.filter(c => !c.archived).sort(byOrder); }
+function activeGroups(cat) { return S.courses.filter(c => !c.archived && c.category === cat).sort(byOrder); }
 function courseById(id) { return findById(S.courses, id); }
 function habitById(id) { return findById(S.habits, id); }
 
@@ -928,6 +1025,27 @@ function scheduleSave(ms) {
   const wait = Math.max(base, nextSaveAllowedAt - Date.now()); // honor rate-limit backoff
   saveTimer = setTimeout(() => saveNow(), wait);
 }
+function sweepOrphanAttachments() {
+  // Reclaim METADATA for attachments nothing references any more (files stay —
+  // another device's unsent ops may still reference an id; its replay restores
+  // the metadata, which is why only entries past a grace window are swept).
+  try {
+    const referenced = new Set();
+    for (const t of S.tasks) for (const id of (t.images || [])) referenced.add(id);
+    for (const w of Object.values(S.weeklySummaries)) {
+      if (!w || typeof w !== "object") continue;
+      for (const entry of [...Object.values(w.courses || {}), w.work, w.personal]) {
+        if (entry) for (const id of (entry.images || [])) referenced.add(id);
+      }
+    }
+    if (UI.sheet?.params?.draft?.images) for (const id of UI.sheet.params.draft.images) referenced.add(id);
+    for (const [id, m] of Object.entries(S.attachments)) {
+      if (referenced.has(id)) continue;
+      const age = Date.now() - Date.parse(m.createdAt || "");
+      if (!(age < 48 * 3600 * 1000)) delete S.attachments[id]; // unparseable createdAt counts as old
+    }
+  } catch {}
+}
 function serializeSnapshot() {
   return JSON.stringify({ ...S, meta: { ...S.meta, seq: S.meta.seq + 1, lastSavedAt: nowIso(), lastSavedBy: deviceId } });
 }
@@ -1038,15 +1156,202 @@ async function ghRefreshIfIdle() {
         try { localWrite(res.text); } catch {}
       }
     }
+    loadEvents();
   } catch {} finally { ghRefreshInFlight = false; }
 }
 window.addEventListener("focus", () => ghRefreshIfIdle());
+
+/* ---- image attachments (stored beside the data file, synced like it) ---- */
+const attUrlCache = new Map();
+function b64FromBytes(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function bytesFromB64(b64) { const bin = atob(String(b64).replace(/\s/g, "")); return Uint8Array.from(bin, c => c.charCodeAt(0)); }
+function attachmentsAvailable() { return (mode === "github" && !!ghToken()) || (mode === "synced" && !!artifactNS); }
+async function compressImage(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file); }
+  catch {
+    const e = new Error("undecodable");
+    e.userMessage = "That image format isn’t supported here — try a JPG, PNG, or a screenshot.";
+    throw e;
+  }
+  for (const [maxDim, q] of [[1600, 0.82], [1280, 0.7], [1000, 0.55]]) {
+    const s = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+    const w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const blob = await new Promise(res => c.toBlob(res, "image/jpeg", q));
+    if (blob && blob.size <= 900 * 1024) return { blob, w, h };
+  }
+  return null;
+}
+async function acquirePublishLock() {
+  // no await between observing the flag clear and setting it → atomic under run-to-completion
+  while (inFlight) { await new Promise(r => setTimeout(r, 150)); }
+  inFlight = true;
+}
+async function uploadAttachment(file) {
+  if (!attachmentsAvailable()) {
+    const e = new Error("unavailable");
+    e.userMessage = mode === "synced" ? "Images aren’t available here." : "Connect sync first — images are stored with your synced planner.";
+    throw e;
+  }
+  const packed = await compressImage(file); // format errors propagate with their own message
+  if (!packed) { const e = new Error("too big"); e.userMessage = "That image couldn’t be compressed enough to store."; throw e; }
+  const id = newId("att");
+  const path = "images/" + id + ".jpg";
+  let sha = null;
+  if (mode === "github") {
+    const bytes = new Uint8Array(await packed.blob.arrayBuffer());
+    const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${path}`, {
+      method: "PUT", headers: { ...ghHeaders(ghToken()), "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "add image", content: b64FromBytes(bytes), branch: GH.branch }),
+    });
+    if (!r.ok) { const e = new Error("upload " + r.status); e.userMessage = "Couldn’t upload the image — check your connection."; throw e; }
+    sha = (await r.json()).content.sha;
+  } else {
+    await acquirePublishLock();
+    try { await artifactNS.publish({ [path]: packed.blob }); }
+    catch { const e = new Error("artifact upload"); e.userMessage = "Couldn’t store the image here."; throw e; }
+    finally { inFlight = false; }
+  }
+  attUrlCache.set(id, URL.createObjectURL(packed.blob));
+  const meta = { path, sha, w: packed.w, h: packed.h, bytes: packed.blob.size, createdAt: nowIso() };
+  dispatch({ t: "att.add", id, meta }, { silent: true });
+  return { id, meta };
+}
+async function attachmentUrl(id) {
+  if (attUrlCache.has(id)) return attUrlCache.get(id);
+  const meta = S.attachments[id];
+  if (!meta) return null;
+  // cache the in-flight promise synchronously so concurrent misses share one fetch
+  const p = (async () => {
+  try {
+    let blob = null;
+    if (mode === "github" && ghToken()) {
+      const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(meta.path)}?ref=${GH.branch}`, { headers: ghHeaders(ghToken()) });
+      if (r.ok) { const j = await r.json(); if (j.content) blob = new Blob([bytesFromB64(j.content)], { type: "image/jpeg" }); }
+    } else {
+      const r = await fetch(meta.path);
+      if (r.ok) blob = await r.blob();
+    }
+    if (!blob) { attUrlCache.delete(id); return null; }
+    const url = URL.createObjectURL(blob);
+    attUrlCache.set(id, url);
+    return url;
+  } catch { attUrlCache.delete(id); return null; }
+  })();
+  attUrlCache.set(id, p);
+  return p;
+}
+function hydrateThumbs(root) {
+  (root || document).querySelectorAll("img[data-att]").forEach(img => {
+    if (img.dataset.loaded) return;
+    img.dataset.loaded = "1";
+    attachmentUrl(img.dataset.att).then(u => {
+      if (u) img.src = u;
+      else img.closest(".att-thumb")?.classList.add("att-missing");
+    });
+  });
+}
+/* ---- external calendar events (fetched by the data repo's scheduled action) ---- */
+let EV = null, evSha = null, feedsSha = null;
+let evByDateCache = null, evByDateFor = null;
+async function loadEvents() {
+  if (mode !== "github" || !ghToken()) return;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/events.json?ref=${GH.branch}`, { headers: ghHeaders(ghToken()), cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.sha === evSha && EV) return;
+    const parsed = JSON.parse(b64decodeUtf8(j.content));
+    if (parsed && Array.isArray(parsed.events)) {
+      evSha = j.sha;
+      EV = { events: parsed.events.filter(e => e && typeof e.start === "string" && typeof e.title === "string").slice(0, 3000) };
+      // Don't yank the DOM out from under someone mid-typing; EV is already
+      // updated, so the next user-action render (or this one-shot) shows it.
+      const ae = document.activeElement, view = document.getElementById("view");
+      if (ae && view && view.contains(ae) && ae.matches("input, textarea")) {
+        ae.addEventListener("blur", () => setTimeout(render, 0), { once: true });
+      } else render();
+    }
+  } catch {}
+}
+function eventsOn(dateKey) {
+  if (!EV) return [];
+  if (evByDateFor !== EV) {
+    evByDateFor = EV; evByDateCache = new Map();
+    for (const e of EV.events) {
+      let d;
+      if (e.allDay) d = String(e.start).slice(0, 10);
+      else { const dt = new Date(e.start); if (isNaN(dt)) continue; d = dateKeyOf(dt); }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      if (!evByDateCache.has(d)) evByDateCache.set(d, []);
+      evByDateCache.get(d).push(e);
+    }
+    for (const arr of evByDateCache.values()) arr.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  }
+  return evByDateCache.get(dateKey) || [];
+}
+function evTime(e) {
+  if (e.allDay) return "all day";
+  const d = new Date(e.start);
+  if (isNaN(d)) return "";
+  const f = (x) => String(x.getHours()).padStart(2, "0") + ":" + String(x.getMinutes()).padStart(2, "0");
+  const end = e.end ? new Date(e.end) : null;
+  if (!end || isNaN(end)) return f(d);
+  const days = Math.round((parseDateKey(dateKeyOf(end)) - parseDateKey(dateKeyOf(d))) / 864e5);
+  return f(d) + "–" + f(end) + (days > 0 ? " +" + days : "");
+}
+let feedsBusy = false, feedsGen = 0;
+async function loadFeeds(gen) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/feeds.json?ref=${GH.branch}`, { headers: ghHeaders(ghToken()), cache: "no-store" });
+    if (r.status === 404) { if (gen === feedsGen) feedsSha = null; return { feeds: [] }; }
+    if (!r.ok) return { feeds: [], error: true };
+    const j = await r.json();
+    const parsed = JSON.parse(b64decodeUtf8(j.content));
+    if (gen === feedsGen) feedsSha = j.sha; // never let a superseded response roll the sha back
+    return { feeds: Array.isArray(parsed.feeds) ? parsed.feeds.filter(f => f && typeof f.url === "string") : [] };
+  } catch { return { feeds: [], error: true }; }
+}
+async function saveFeeds(feeds) {
+  feedsGen++; // any in-flight feeds GET is now stale
+  const body = { message: "update calendar feeds", content: b64encodeUtf8(JSON.stringify({ feeds })), branch: GH.branch };
+  if (feedsSha) body.sha = feedsSha;
+  const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/feeds.json`, {
+    method: "PUT", headers: { ...ghHeaders(ghToken()), "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = new Error("feeds save " + r.status); e.status = r.status; throw e; }
+  feedsSha = (await r.json()).content.sha;
+}
+async function deleteAttachmentFile(meta) {
+  if (!meta) return;
+  try {
+    if (mode === "github" && meta.sha) {
+      await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${encodeURI(meta.path)}`, {
+        method: "DELETE", headers: { ...ghHeaders(ghToken()), "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "remove image", sha: meta.sha, branch: GH.branch }),
+      });
+    } else if (mode === "synced" && artifactNS) {
+      await acquirePublishLock();
+      try { await artifactNS.publish({ [meta.path]: null }); }
+      finally { inFlight = false; if (dirty) scheduleSave(200); }
+    }
+  } catch {}
+}
 
 async function saveNow(opts = {}) {
   if (mode === "readonly" || mode === "load-error" || conflictLock || !dirty) return;
   if (mode === "booting") { scheduleSave(800); return; }
   if (Date.now() < nextSaveAllowedAt) { saveState = "backoff"; scheduleSave(); updateChrome(); return; }
-  if (inFlight) { return; } // opLog keeps growing; finally-block reschedules
+  sweepOrphanAttachments();
+  if (inFlight) { scheduleSave(500); return; } // an attachment publish may hold inFlight; poll until it drains
   inFlight = true; saveState = "saving"; updateChrome();
   const opCountAtSnapshot = opLog.length;
   const snapshot = serializeSnapshot();
@@ -1249,7 +1554,7 @@ function updateChrome() {
   chip.className = cls; chip.title = title;
   chip.querySelector(".chip-text").textContent = text;
   let b = "";
-  if (futureVersion) b = '<div class="banner banner-warn">This page is an older version of the app than your data. Open the latest version to edit — showing read-only.</div>';
+  if (futureVersion) b = '<div class="banner banner-warn">This page is running an older version of the app — showing read-only.<span class="spacer"></span><button data-action="reload-app">Reload to update</button></div>';
   else if (mode === "load-error") b = '<div class="banner banner-warn">Couldn’t load your data — retrying. Editing is paused so nothing gets overwritten.<span class="spacer"></span><button data-action="reload-app">Reload</button></div>';
   else if (mode === "readonly") b = '<div class="banner banner-info">View-only — you don’t have edit access on this device.</div>';
   else if (mode === "local-only" && UI.bootDone) {
@@ -1337,7 +1642,13 @@ async function boot() {
   restoreStash();
   if (dirty) scheduleSave();
   updateChrome(); render();
-  if (UI.pendingSheet) { const ps = UI.pendingSheet; UI.pendingSheet = null; openSheet(ps.kind, ps.params); }
+  if (UI.pendingSheet) {
+    const ps = UI.pendingSheet; UI.pendingSheet = null;
+    if (ps.kind === "sync") { ps.params.feeds = null; feedsSha = null; } // never trust a stashed feed list
+    openSheet(ps.kind, ps.params);
+    if (ps.kind === "sync") refreshFeedsUI();
+  }
+  loadEvents();
 }
 async function retryDataLoad() {
   for (let i = 0; i < 3 && mode === "load-error"; i++) {
@@ -1393,11 +1704,11 @@ function catColor(cat) { return `var(--cat-${cat})`; }
 function catSoft(cat) { return `var(--cat-${cat}-soft)`; }
 function swColor(i) { return `var(--sw-${((i % 12) + 12) % 12})`; }
 function taskColor(t) {
-  if (t.category === "study" && t.courseId) { const c = courseById(t.courseId); if (c) return swColor(c.colorIndex); }
+  if (t.courseId) { const c = courseById(t.courseId); if (c) return swColor(c.colorIndex); }
   return catColor(t.category);
 }
 function taskContextLabel(t) {
-  if (t.category === "study" && t.courseId) { const c = courseById(t.courseId); if (c) return c.name; }
+  if (t.courseId) { const c = courseById(t.courseId); if (c) return c.name; }
   return t.label || CAT_LABEL[t.category];
 }
 
@@ -1414,7 +1725,27 @@ const IC = {
   plus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   flame: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 22c-4 0-7-2.8-7-6.6 0-2.9 1.9-4.9 3.4-6.7C9.7 7.2 11 5.7 11 3.5c0-.6.6-1 1.1-.7 2.8 1.6 6.9 5.5 6.9 12.6 0 3.8-3 6.6-7 6.6Zm0-2c1.7 0 3-1.2 3-2.9 0-1.9-1.4-3-3-4.6-1.6 1.6-3 2.7-3 4.6 0 1.7 1.3 2.9 3 2.9Z"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 7 10 17 5 12"/></svg>',
+  image: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.7"/><path d="m5 18 5-5 3 3 3.5-3.5L20.5 16"/></svg>',
 };
+
+/* markdown-lite: **bold** and *italic* on top of escaped text */
+function mdLite(text) {
+  let h = esc(text);
+  h = h.replace(/\*\*([^\n]+?)\*\*/g, "<b>$1</b>");
+  h = h.replace(/(^|\s)\*([^*\n]+?)\*/g, "$1<i>$2</i>");
+  return h;
+}
+/* attachment thumbnails; owner is a string of data-* attributes for the actions */
+function attRowHTML(ids, owner) {
+  const thumbs = (ids || []).filter(id => S.attachments[id]).map(id =>
+    `<button type="button" class="att-thumb" data-action="view-att" data-id="${esc(id)}" ${owner} aria-label="View image"><img data-att="${esc(id)}" alt=""></button>`).join("");
+  return thumbs ? `<div class="att-row">${thumbs}</div>` : "";
+}
+function attRowSheetHTML(ids) {
+  const thumbs = (ids || []).map(id =>
+    `<span class="att-thumb">${S.attachments[id] ? `<img data-att="${esc(id)}" alt="">` : ""}<button type="button" class="att-x" data-action="ts-img-remove" data-id="${esc(id)}" aria-label="Remove image">✕</button></span>`).join("");
+  return `<div class="att-row">${thumbs}<button type="button" class="att-add" data-action="att-add-task" aria-label="Add image">${IC.image}</button></div>`;
+}
 
 /* task row */
 function checkBtn(t) {
@@ -1573,6 +1904,7 @@ function renderSheet() {
   } else if (hadFocus) {
     sheetEl.focus({ preventScroll: true });
   }
+  hydrateThumbs(root);
 }
 let toastTimer = null, toastAction = null;
 function toast(text, action) {
@@ -1703,6 +2035,15 @@ function viewHome() {
   <div class="home-grid">
   <div class="home-col">
     ${overdueBannerHTML(overdue, "all")}
+    ${(() => {
+      const evs = eventsOn(today);
+      return evs.length ? `<div class="section-label">Today’s schedule</div>
+      <div class="card"><div class="rows">${evs.map(e => `<div class="row" style="min-height:44px">
+        <span class="ev-time">${esc(evTime(e))}</span>
+        <span class="row-main"><span class="row-title">${esc(e.title)}</span>
+        <span class="row-meta">${esc(e.location ? e.location + " · " : "")}${esc(e.feed || "")}</span></span>
+      </div>`).join("")}</div></div>` : "";
+    })()}
     <div class="section-label">Today</div>
     <div class="card">${todays.length
       ? `<div class="rows">${sortedRows(todays, { hideDate: true })}</div>`
@@ -1741,38 +2082,40 @@ function viewPlanner() {
   const normal = all.filter(t => !t.isDeadline);
   const catOverdue = wk === cw ? overdueTasks().filter(t => t.category === cat) : [];
   let body = "";
-  if (cat === "study") {
-    const courses = activeCourses();
+  if (cat === "study" || cat === "work") {
+    const groups = activeGroups(cat);
+    const catGroups = [...S.courses].sort(byOrder).filter(c => c.category === cat);
     const showAll = compareWeekKeys(wk, cw) >= 0;
     const cards = [];
-    for (const c of [...S.courses].sort(byOrder)) {
+    const cardIds = new Set();
+    for (const c of catGroups) {
       const tasks = normal.filter(t => t.courseId === c.id);
-      const summary = S.weeklySummaries[wk]?.courses?.[c.id]?.text || "";
-      const visible = c.archived ? (tasks.length || summary) : (showAll || tasks.length || summary);
+      const entry = S.weeklySummaries[wk]?.courses?.[c.id] || null;
+      const visible = c.archived ? (tasks.length || entry) : (showAll || tasks.length || entry);
       if (!visible) continue;
-      cards.push(courseCardHTML(c, tasks, summary, wk));
+      cardIds.add(c.id);
+      cards.push(courseCardHTML(c, tasks, entry, wk, cat));
     }
-    // no courseId, or a courseId whose course no longer exists (dangling ref)
-    const generalTasks = normal.filter(t => !t.courseId || !courseById(t.courseId));
-    if (generalTasks.length) cards.push(courseCardHTML(null, generalTasks, "", wk));
-    if (!courses.length && !cards.length) {
+    // no group, a group of another category, or a dangling reference → General (kept on top)
+    const generalTasks = normal.filter(t => !t.courseId || !cardIds.has(t.courseId));
+    if (generalTasks.length || (cat === "work" && !cards.length)) cards.unshift(courseCardHTML(null, generalTasks, null, wk, cat));
+    if (cat === "study" && !groups.length && !cards.length) {
       body = `<div class="card empty" style="margin-top:14px">
         <div class="big">No courses yet</div>
         Courses give your tasks a color and a home.
-        <br><button class="btn btn-primary" data-action="manage-courses">Add your first course</button></div>`;
+        <br><button class="btn btn-primary" data-action="manage-courses" data-cat="study">Add your first course</button></div>`;
     } else {
       body = `<div class="stack" style="margin-top:12px">${cards.join("")}</div>
         ${!normal.length && !deadlines.length ? peekNextHTML(cat) : ""}`;
     }
-    body += `<div style="text-align:center;margin-top:12px"><button class="btn-quiet" data-action="manage-courses">${IC.gear}&nbsp; Manage courses</button></div>`;
+    if (cat === "work") body += summaryBlockHTML("work", wk, S.weeklySummaries[wk]?.work || null, "Week notes");
+    body += `<div style="text-align:center;margin-top:12px"><button class="btn-quiet" data-action="manage-courses" data-cat="${cat}">${IC.gear}&nbsp; Manage ${GROUP_NOUN_PLURAL[cat].toLowerCase()}</button></div>`;
   } else {
-    const summary = cat === "work" ? (S.weeklySummaries[wk]?.work?.text || "") : "";
     body = `<div class="card" style="margin-top:12px">
-      <div class="section-label" style="margin:0 0 6px">${cat === "work" ? "To finish this week" : "This week"}</div>
+      <div class="section-label" style="margin:0 0 6px">This week</div>
       ${normal.length ? `<div class="rows">${sortedRows(normal)}</div>` : `<div class="empty" style="padding:12px">No tasks yet for this week.</div>`}
-      <button class="ghost-add" data-action="open-task-sheet" data-cat="${cat}" data-week="${wk}">${IC.plus}<span>Add task</span></button>
+      <button class="ghost-add" data-action="open-task-sheet" data-cat="personal" data-week="${wk}">${IC.plus}<span>Add task</span></button>
     </div>
-    ${cat === "work" ? summaryBlockHTML("work", wk, summary, "Week notes") : ""}
     ${!normal.length && !deadlines.length ? peekNextHTML(cat) : ""}`;
   }
   return `<div class="seg seg-planner" style="margin-bottom:6px">${CATS.map(c =>
@@ -1785,36 +2128,49 @@ function viewPlanner() {
     ${body}
     ${insightsHTML(cat)}`;
 }
-function courseCardHTML(course, tasks, summary, wk) {
+function courseCardHTML(course, tasks, entry, wk, cat) {
   const color = course ? swColor(course.colorIndex) : "var(--surface-3)";
   const name = course ? course.name : "General";
   const done = tasks.filter(t => t.status === "done").length;
-  const editing = UI.editingSummary === (course ? course.id : null) + "|" + wk;
   return `<div class="card course-card" style="border-left-color:${color}">
     <div class="course-head">
       <span class="course-name">${esc(name)}${course && course.archived ? ' <small style="color:var(--text-3);font:500 11px var(--font-ui)">archived</small>' : ""}</span>
       ${tasks.length ? `<span class="course-count">${done}/${tasks.length} done</span>` : ""}
     </div>
     ${tasks.length ? `<div class="rows" style="margin-top:4px">${sortedRows(tasks, { hideContext: true })}</div>` : ""}
-    <button class="ghost-add" data-action="open-task-sheet" data-cat="study" data-week="${wk}" ${course ? `data-course="${esc(course.id)}"` : ""}>${IC.plus}<span>Add task</span></button>
-    ${course ? summaryBlockHTML(course.id, wk, summary, "Week summary", editing) : ""}
+    <button class="ghost-add" data-action="open-task-sheet" data-cat="${esc(cat)}" data-week="${wk}" ${course ? `data-course="${esc(course.id)}"` : ""}>${IC.plus}<span>Add task</span></button>
+    ${course ? summaryBlockHTML(course.id, wk, entry, "Week summary") : ""}
   </div>`;
 }
-function summaryBlockHTML(scope, wk, text, label, editingOverride) {
-  const editing = editingOverride != null ? editingOverride : UI.editingSummary === scope + "|" + wk;
-  const inner = editing
-    ? `<textarea class="summary-edit" rows="3" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">${esc(text)}</textarea>`
-    : `<button class="summary-preview${text ? "" : " empty"}" data-action="summary-edit" data-scope="${esc(scope)}" data-week="${wk}">${text ? esc(text) : "Add a summary for this week…"}</button>`;
-  const wrap = scope === "work"
-    ? `<div class="card" style="margin-top:12px"><div class="summary-block" style="border-top:0;margin-top:0;padding-top:0"><div class="lbl">${label} · week ${parseWeekKey(wk).week}</div>${inner}</div></div>`
-    : `<div class="summary-block"><div class="lbl">${label}</div>${inner}</div>`;
-  return wrap;
+function summaryBlockHTML(scope, wk, entry, label) {
+  const text = entry ? String(entry.text || "") : "";
+  const images = entry && entry.images ? entry.images : [];
+  const editing = UI.editingSummary === scope + "|" + wk;
+  const owner = `data-scope="${esc(scope)}" data-week="${wk}"`;
+  let inner;
+  if (editing) {
+    inner = `<div class="md-tools">
+        <button type="button" data-action="md-wrap" data-wrap="**" aria-label="Bold"><b>B</b></button>
+        <button type="button" data-action="md-wrap" data-wrap="*" aria-label="Italic"><i>I</i></button>
+        <button type="button" data-action="att-add-summary" ${owner} aria-label="Add image">${IC.image}</button>
+      </div>
+      <textarea class="summary-edit" rows="3" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">\n${esc(text)}</textarea>
+      <div class="hint">**bold** · *italic* · paste a screenshot to attach it</div>
+      ${attRowHTML(images, owner)}`;
+  } else {
+    inner = `<button class="summary-preview${text || images.length ? "" : " empty"}" data-action="summary-edit" ${owner}>${text ? mdLite(text) : (images.length ? "<span style='color:var(--text-3)'>Add text…</span>" : "Add a summary for this week…")}</button>
+      ${attRowHTML(images, owner)}`;
+  }
+  const bodyHtml = `<div class="lbl">${label}${scope === "work" ? " · week " + parseWeekKey(wk).week : ""}</div>${inner}`;
+  return scope === "work"
+    ? `<div class="card" style="margin-top:12px"><div class="summary-block" style="border-top:0;margin-top:0;padding-top:0">${bodyHtml}</div></div>`
+    : `<div class="summary-block">${bodyHtml}</div>`;
 }
 
 function viewCalendar() {
   const y = UI.calYear, m = UI.calMonth0;
   const weeks = calendarMonth(y, m);
-  const anyItems = weeks.some(w => w.days.some(d => d.items.length));
+  const anyItems = weeks.some(w => w.days.some(d => d.items.length || eventsOn(d.dateKey).length));
   const dows = ["M", "T", "W", "T", "F", "S", "S"];
   const dows3 = DAY3;
   let grid = `<div class="cal-dow"></div>` + dows.map((d, i) =>
@@ -1822,15 +2178,22 @@ function viewCalendar() {
   for (const w of weeks) {
     grid += `<button class="cal-wk" data-action="cal-week-jump" data-week="${w.weekKey}" aria-label="Open week ${parseWeekKey(w.weekKey).week} in planner">W${parseWeekKey(w.weekKey).week}</button>`;
     for (const d of w.days) {
+      const evs = eventsOn(d.dateKey);
       const dots = d.items.slice(0, 4).map(t =>
         `<span class="cal-dot${t.isDeadline ? " diamond" : ""}${t.status === "done" ? " done" : ""}" style="background:${taskColor(t)}"></span>`).join("") +
-        (d.items.length > 4 ? `<span class="cal-more">+</span>` : "");
-      const pills = d.items.slice(0, 3).map(t =>
+        (d.items.length > 4 ? `<span class="cal-more">+</span>` : "") +
+        (evs.length ? `<span class="cal-dot ev"></span>` : "");
+      const taskPills = d.items.slice(0, 3).map(t =>
         `<span class="cal-pill${t.status === "done" ? " done" : ""}" style="background:${catSoft(t.category)}">${t.isDeadline ? "◆ " : ""}${esc(t.title)}</span>`).join("") +
         (d.items.length > 3 ? `<span class="cal-pill-more">+${d.items.length - 3} more</span>` : "");
-      grid += `<button class="cal-cell${d.inMonth ? "" : " out"}${d.isToday ? " today" : ""}" data-action="cal-day" data-date="${d.dateKey}" aria-label="${fmtDateShort(d.dateKey)}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}">
+      const evSlots = Math.max(0, 4 - Math.min(d.items.length, 3) - (d.items.length > 3 ? 1 : 0));
+      const evPills = evs.slice(0, evSlots).map(e =>
+        `<span class="cal-pill cal-pill-ev">${e.allDay ? "" : esc(evTime(e).split("–")[0]) + " "}${esc(e.title)}</span>`).join("") +
+        (evs.length > evSlots ? `<span class="cal-pill-more">+${evs.length - evSlots} event${evs.length - evSlots === 1 ? "" : "s"}</span>` : "");
+      const total = d.items.length + evs.length;
+      grid += `<button class="cal-cell${d.inMonth ? "" : " out"}${d.isToday ? " today" : ""}" data-action="cal-day" data-date="${d.dateKey}" aria-label="${fmtDateShort(d.dateKey)}, ${total} item${total === 1 ? "" : "s"}">
         <span class="cal-num">${d.day}</span>
-        ${d.items.length ? `<span class="cal-dots">${dots}</span><span class="cal-pills">${pills}</span>` : ""}
+        ${total ? `<span class="cal-dots">${dots}</span><span class="cal-pills">${d.items.length ? taskPills : ""}${evPills}</span>` : ""}
       </button>`;
     }
   }
@@ -1953,15 +2316,15 @@ const SHEETS = {
     const d = p.draft;
     const isEdit = !!p.id;
     const wk = d.weekKey;
-    const courses = activeCourses();
+    const groups = (d.category === "study" || d.category === "work") ? activeGroups(d.category) : [];
     const movesTo = d.dueDate && weekKeyOf(parseDateKey(d.dueDate)) !== wk ? weekKeyOf(parseDateKey(d.dueDate)) : null;
     const tpl = isEdit && p.templateId ? findById(S.recurringTemplates, p.templateId) : null;
     return `<h2>${isEdit ? "Edit task" : "New task"}</h2>
     <div class="field"><input class="text-input" type="text" placeholder="What needs to be done?" value="${esc(d.title)}" data-draft-field="title" data-autofocus aria-label="Task title"></div>
     ${p.lockCategory ? "" : `<div class="field"><label>Category</label><div class="chip-row">${CATS.map(c =>
       `<button class="chip" data-action="ts-cat" data-cat="${c}" aria-pressed="${d.category === c}"><span class="cdot" style="background:${catColor(c)}"></span>${CAT_LABEL[c]}</button>`).join("")}</div></div>`}
-    ${d.category === "study" && courses.length ? `<div class="field"><label>Course</label><div class="chip-row">
-      ${courses.map(c => `<button class="chip" data-action="ts-course" data-id="${esc(c.id)}" aria-pressed="${d.courseId === c.id}"><span class="cdot" style="background:${swColor(c.colorIndex)}"></span>${esc(c.name)}</button>`).join("")}
+    ${groups.length ? `<div class="field"><label>${d.category === "study" ? "Course" : "Project"}</label><div class="chip-row">
+      ${groups.map(c => `<button class="chip" data-action="ts-course" data-id="${esc(c.id)}" aria-pressed="${d.courseId === c.id}"><span class="cdot" style="background:${swColor(c.colorIndex)}"></span>${esc(c.name)}</button>`).join("")}
       <button class="chip" data-action="ts-course" data-id="" aria-pressed="${!d.courseId}">None</button>
     </div></div>` : ""}
     ${d.repeat ? "" : `<div class="field"><label>When — week ${parseWeekKey(wk).week}</label><div class="chip-row">
@@ -1977,24 +2340,36 @@ const SHEETS = {
       <button class="switch" data-action="ts-repeat" role="switch" aria-checked="${!!d.repeat}" aria-pressed="${!!d.repeat}" aria-label="Repeats weekly"></button></div>` : ""}
     ${tpl && !tpl.archived ? `<div class="switch-row"><span><span class="lbl">Repeats weekly</span><br><span class="sub">Editing changes only this week’s copy</span></span>
       <button class="btn-quiet" data-action="ts-stop-repeat" data-id="${esc(tpl.id)}">Stop repeating</button></div>` : ""}
-    <div class="field" style="margin-top:10px"><textarea class="text-input" rows="2" placeholder="Notes (optional)" data-draft-field="notes">${esc(d.notes)}</textarea></div>
+    <div class="field" style="margin-top:10px"><textarea class="text-input" rows="2" placeholder="Notes (optional)" data-draft-field="notes">\n${esc(d.notes)}</textarea></div>
+    <div class="field"><label>Images</label>${attRowSheetHTML(d.images)}</div>
     <div class="sheet-footer">
       ${isEdit ? `<button class="btn-danger" data-action="ts-delete" data-id="${esc(p.id)}">Delete</button>` : ""}
       <button class="btn btn-primary" data-action="ts-save">${isEdit ? "Save" : "Add task"}</button>
     </div>`;
   },
-  courses() {
-    const active = S.courses.filter(c => !c.archived).sort(byOrder);
-    const archived = S.courses.filter(c => c.archived).sort(byOrder);
-    return `<h2>Courses</h2>
+  image(p) {
+    return `<h2>Image</h2>
+    <div class="lightbox"><img data-att="${esc(p.id)}" alt=""></div>
+    <div class="sheet-footer">
+      ${p.scope ? `<button class="btn-danger" data-action="att-delete" data-id="${esc(p.id)}" data-scope="${esc(p.scope)}" data-week="${esc(p.week)}">${p.confirm ? "Really delete?" : "Delete"}</button>` : ""}
+      <button class="btn btn-primary" data-action="sheet-close">Close</button>
+    </div>`;
+  },
+  courses(p) {
+    const cat = p.cat === "work" ? "work" : "study";
+    const mine = S.courses.filter(c => c.category === cat);
+    const active = mine.filter(c => !c.archived).sort(byOrder);
+    const archived = mine.filter(c => c.archived).sort(byOrder);
+    const noun = GROUP_NOUN[cat];
+    return `<h2>${GROUP_NOUN_PLURAL[cat]}</h2>
     ${active.length ? `<div>${active.map(c => `<div class="mgr-row">
       <button class="color-dot-btn" style="background:${swColor(c.colorIndex)}" data-action="course-color" data-id="${esc(c.id)}" aria-label="Change color of ${esc(c.name)}"></button>
-      <input type="text" value="${esc(c.name)}" data-course-name="${esc(c.id)}" aria-label="Course name">
+      <input type="text" value="${esc(c.name)}" data-course-name="${esc(c.id)}" aria-label="${noun} name">
       <button class="btn-quiet" data-action="course-archive" data-id="${esc(c.id)}">Archive</button>
-    </div>`).join("")}</div>` : `<div class="empty" style="padding:10px 0 16px">Add the courses you’re taking — each gets its own color.</div>`}
-    <form class="mgr-row" data-form="course-add" style="border-top:1px solid var(--border)">
-      <span class="color-dot-btn" style="background:${swColor(active.length + archived.length)};border-style:dashed"></span>
-      <input type="text" placeholder="New course name…" id="new-course-name" aria-label="New course name">
+    </div>`).join("")}</div>` : `<div class="empty" style="padding:10px 0 16px">${cat === "study" ? "Add the courses you’re taking — each gets its own color." : "Projects group your work tasks — each gets its own color."}</div>`}
+    <form class="mgr-row" data-form="course-add" data-cat="${cat}" style="border-top:1px solid var(--border)">
+      <span class="color-dot-btn" style="background:${swColor(mine.length)};border-style:dashed"></span>
+      <input type="text" placeholder="New ${noun} name…" id="new-course-name" aria-label="New ${noun} name">
       <button type="submit" class="btn btn-ghost" style="min-height:36px">Add</button>
     </form>
     ${archived.length ? `<div class="section-label" style="margin-top:14px">Archived</div>${archived.map(c => `<div class="mgr-row">
@@ -2027,9 +2402,15 @@ const SHEETS = {
   },
   day(p) {
     const items = tasksOnDate(p.dateKey);
+    const evs = eventsOn(p.dateKey);
     const wk = weekKeyOf(parseDateKey(p.dateKey));
     return `<h2>${fmtDateShort(p.dateKey)} · Week ${parseWeekKey(wk).week}</h2>
-    ${items.length ? `<div class="rows">${items.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : `<div class="empty" style="padding:10px">Nothing planned on this day.</div>`}
+    ${evs.length ? `<div class="rows" style="margin-bottom:${items.length ? "10px" : "0"}">${evs.map(e => `<div class="row" style="min-height:44px">
+      <span class="ev-time">${esc(evTime(e))}</span>
+      <span class="row-main"><span class="row-title">${esc(e.title)}</span>
+      <span class="row-meta">${esc(e.location ? e.location + " · " : "")}${esc(e.feed || "")}</span></span>
+    </div>`).join("")}</div>` : ""}
+    ${items.length ? `<div class="rows">${items.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : (evs.length ? "" : `<div class="empty" style="padding:10px">Nothing planned on this day.</div>`)}
     <div class="sheet-footer">
       <button class="btn btn-ghost" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wk)}" data-date="${esc(p.dateKey)}">${IC.plus}&nbsp;Add task on this day</button>
     </div>`;
@@ -2065,6 +2446,13 @@ const SHEETS = {
       ${tokenSet ? `<button class="btn-danger" data-action="sync-disconnect">Disconnect</button>` : ""}
       <button class="btn btn-primary" data-action="sync-connect">Connect</button>
     </div>
+    ${connected ? `<div class="field" style="margin-top:20px"><label>Calendar feeds — Outlook, TU Delft…</label>
+      <div id="feeds-list" class="hint" style="margin:0 0 10px">Loading…</div>
+      <input class="text-input" type="text" placeholder="Name (e.g. TU Delft)" data-draft-field="feedName" style="margin-bottom:8px">
+      <input class="text-input" type="url" placeholder="iCal / ICS link (https://…)" data-draft-field="feedUrl">
+      <div class="sheet-footer" style="margin-top:8px"><button class="btn btn-ghost" data-action="cal-feed-add">Add calendar</button></div>
+      <p class="hint">Events refresh automatically a few times a day. In Outlook: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link. In TU Delft MyTimetable: Connect calendar → iCal.</p>
+    </div>` : ""}
     <div class="field" style="margin-top:20px"><label>Restore from a backup</label>
       <textarea class="text-input" rows="3" placeholder="Paste a WeekWise backup (JSON) here…" data-draft-field="importJson"></textarea>
       <div class="sheet-footer" style="margin-top:8px">
@@ -2096,7 +2484,7 @@ function newTaskParams(ds) {
     draft: {
       title: "", category: CATS.includes(ds.cat) ? ds.cat : "personal",
       courseId: ds.course || null, weekKey: parseWeekKey(ds.week || "") ? ds.week : UI.weekKey,
-      dueDate: ds.date || null, isDeadline: false, notes: "", repeat: false,
+      dueDate: ds.date || null, isDeadline: false, notes: "", repeat: false, images: [],
     },
   };
 }
@@ -2128,11 +2516,16 @@ const ACTIONS = {
     openSheet("task", { id: t.id, templateId: t.templateId, lockCategory: false, draft: {
       title: t.title, category: t.category, courseId: t.courseId, weekKey: t.weekKey,
       dueDate: t.dueDate, isDeadline: t.isDeadline, notes: t.notes, repeat: false,
+      images: [...(t.images || [])],
     }});
   },
   "open-task-sheet"(el) { openSheet("task", newTaskParams(el.dataset)); },
   "ws-task"() { openSheet("task", newTaskParams({ cat: "study", week: currentCW() })); },
-  "ts-cat"(el) { syncDraftInputs(); const d = UI.sheet.params.draft; d.category = el.dataset.cat; if (d.category !== "study") d.courseId = null; renderSheet(); },
+  "ts-cat"(el) {
+    syncDraftInputs(); const d = UI.sheet.params.draft; d.category = el.dataset.cat;
+    if (d.courseId) { const g = courseById(d.courseId); if (!g || g.category !== d.category) d.courseId = null; }
+    renderSheet();
+  },
   "ts-course"(el) { syncDraftInputs(); UI.sheet.params.draft.courseId = el.dataset.id || null; renderSheet(); },
   "ts-day"(el) { syncDraftInputs(); UI.sheet.params.draft.dueDate = el.dataset.date || null; renderSheet(); },
   "ts-deadline"() { syncDraftInputs(); const d = UI.sheet.params.draft; d.isDeadline = !d.isDeadline; renderSheet(); },
@@ -2146,30 +2539,92 @@ const ACTIONS = {
     syncDraftInputs();
     const p = UI.sheet.params, d = p.draft;
     if (!d.title.trim()) { const t = document.querySelector('#sheet-root [data-draft-field="title"]'); if (t) t.focus(); return; }
-    const courseId = d.category === "study" ? d.courseId : null;
+    const courseId = (d.category === "study" || d.category === "work") ? d.courseId : null;
+    const images = (d.images || []).length ? d.images : null;
     if (p.id) {
+      const orig = findById(S.tasks, p.id);
+      const removed = (orig?.images || []).filter(i => !(d.images || []).includes(i));
       const weekKey = d.dueDate ? weekKeyOf(parseDateKey(d.dueDate)) : d.weekKey;
       dispatch({ t: "task.patch", id: p.id, patch: {
         title: d.title.trim(), category: d.category, courseId,
-        dueDate: d.dueDate, isDeadline: d.isDeadline, notes: d.notes, weekKey,
+        dueDate: d.dueDate, isDeadline: d.isDeadline, notes: d.notes, weekKey, images,
       }}, { silent: true });
+      for (const id of removed) {
+        const meta = S.attachments[id];
+        dispatch({ t: "att.remove", id }, { silent: true });
+        deleteAttachmentFile(meta);
+      }
     } else if (d.repeat) {
+      const rtId = newId("rt");
       dispatch({ t: "template.upsert", template: {
-        id: newId("rt"), title: d.title.trim(), category: d.category, courseId, label: null,
+        id: rtId, title: d.title.trim(), category: d.category, courseId, label: null,
         notes: d.notes, fromWeek: d.weekKey, untilWeek: null, skipWeeks: [], archived: false,
         sortOrder: nextSortOrder(S.recurringTemplates), createdAt: nowIso(), updatedAt: nowIso(),
       }}, { silent: true });
       materializeWeek(d.weekKey);
+      // drafted images attach to this week's copy (future instances start clean)
+      if (images) dispatch({ t: "task.patch", id: "ti_" + rtId + "_" + d.weekKey, patch: { images } }, { silent: true });
     } else {
       const weekKey = d.dueDate ? weekKeyOf(parseDateKey(d.dueDate)) : d.weekKey;
-      dispatch({ t: "task.upsert", task: {
+      const task = {
         id: newId("t"), title: d.title.trim(), category: d.category, courseId, label: null,
         weekKey, dueDate: d.dueDate, isDeadline: d.isDeadline, status: "open", doneAt: null,
         notes: d.notes, templateId: null, sortOrder: nextSortOrder(S.tasks),
         createdAt: nowIso(), updatedAt: nowIso(),
-      }}, { silent: true });
+      };
+      if (images) task.images = images;
+      dispatch({ t: "task.upsert", task }, { silent: true });
     }
     closeSheet();
+  },
+  "ts-img-remove"(el) {
+    syncDraftInputs();
+    const p = UI.sheet.params, d = p.draft;
+    const id = el.dataset.id;
+    d.images = (d.images || []).filter(i => i !== id);
+    const orig = p.id ? findById(S.tasks, p.id) : null;
+    if (!(orig?.images || []).includes(id)) {
+      // uploaded during this sheet session; nothing else can reference it
+      const meta = S.attachments[id];
+      dispatch({ t: "att.remove", id }, { silent: true });
+      deleteAttachmentFile(meta);
+    }
+    renderSheet(); hydrateThumbs(document.getElementById("sheet-root"));
+  },
+  "att-add-task"() {
+    if (!attachmentsAvailable()) { toast(mode === "synced" ? "Images aren’t available here." : "Connect sync first — images are stored with your synced planner."); return; }
+    UI.attachTarget = { kind: "tasksheet", draft: UI.sheet?.params?.draft || null };
+    document.getElementById("att-file").click();
+  },
+  "att-add-summary"(el) {
+    if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
+    UI.attachTarget = { kind: "summary", scope: el.dataset.scope, week: el.dataset.week };
+    document.getElementById("att-file").click();
+  },
+  "view-att"(el) {
+    openSheet("image", { id: el.dataset.id, scope: el.dataset.scope || null, week: el.dataset.week || null });
+    hydrateThumbs(document.getElementById("sheet-root"));
+  },
+  "att-delete"(el) {
+    const p = UI.sheet.params;
+    if (!p.confirm) { p.confirm = true; renderSheet(); hydrateThumbs(document.getElementById("sheet-root")); return; }
+    const id = el.dataset.id;
+    const meta = S.attachments[id];
+    dispatch({ t: "summary.image", weekKey: el.dataset.week, scope: el.dataset.scope, id, add: false }, { silent: true });
+    dispatch({ t: "att.remove", id }, { silent: true });
+    deleteAttachmentFile(meta);
+    closeSheet();
+  },
+  "md-wrap"(el) {
+    const ta = document.querySelector("#view textarea[data-summary]");
+    if (!ta) return;
+    const w = el.dataset.wrap;
+    const s = ta.selectionStart, e2 = ta.selectionEnd;
+    const sel = ta.value.slice(s, e2) || "text";
+    ta.value = ta.value.slice(0, s) + w + sel + w + ta.value.slice(e2);
+    ta.focus();
+    ta.setSelectionRange(s + w.length, s + w.length + sel.length);
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
   },
   "ts-delete"(el) {
     const t = findById(S.tasks, el.dataset.id); if (!t) return;
@@ -2206,7 +2661,7 @@ const ACTIONS = {
   "reload-app"() { location.reload(); },
   "ring-nav"(el) { UI.weekKey = currentCW(); navTo("planner", el.dataset.cat); },
   "insights-toggle"(el) { const c = el.dataset.cat; UI.insightsOpen[c] = !UI.insightsOpen[c]; saveUiPrefs(); render(); },
-  "manage-courses"() { openSheet("courses"); },
+  "manage-courses"(el) { openSheet("courses", { cat: el && el.dataset.cat === "work" ? "work" : "study" }); },
   "course-color"(el) {
     const c = courseById(el.dataset.id); if (!c) return;
     dispatch({ t: "course.patch", id: c.id, patch: { colorIndex: (c.colorIndex + 1) % 12 } }, { silent: true });
@@ -2306,7 +2761,51 @@ const ACTIONS = {
     dispatch({ t: "habit.deleteAll", id });
   },
   "toggle-archived-habits"() { UI.archivedHabitsOpen = !UI.archivedHabitsOpen; render(); },
-  "open-sync"() { openSheet("sync", { draft: { token: "", importJson: "" } }); },
+  "open-sync"() {
+    feedsSha = null; // never reuse a sha from an earlier sheet session
+    openSheet("sync", { draft: { token: "", importJson: "", feedName: "", feedUrl: "" }, feeds: null });
+    refreshFeedsUI();
+  },
+  async "cal-feed-add"() {
+    const p = UI.sheet.params, d = p.draft;
+    if (feedsBusy) return;
+    syncDraftInputs();
+    if (!Array.isArray(p.feeds)) { toast("Calendars are still loading — try again in a moment."); return; }
+    const name = (d.feedName || "").trim() || "Calendar";
+    const url = (d.feedUrl || "").trim();
+    if (!/^https:\/\/.+/.test(url)) { toast("Paste the full https:// iCal link first."); document.querySelector('#sheet-root [data-draft-field="feedUrl"]')?.focus(); return; }
+    const feeds = [...p.feeds, { name, url }];
+    feedsBusy = true;
+    try {
+      await saveFeeds(feeds);
+      p.feeds = feeds; d.feedName = ""; d.feedUrl = "";
+      renderSheet(); renderFeedRows(feeds);
+      toast("Calendar added — events appear within a few minutes.");
+    } catch (e) {
+      if (e.status === 409 || e.status === 422) { toast("The calendar list changed on another device — refreshed it, try again."); refreshFeedsUI(); }
+      else toast("Couldn’t save the calendar — check your connection.");
+    } finally { feedsBusy = false; }
+  },
+  async "cal-feed-remove"(el) {
+    const p = UI.sheet.params;
+    if (feedsBusy) return;
+    if (!Array.isArray(p.feeds)) { toast("Calendars are still loading — try again in a moment."); return; }
+    const feeds = [...p.feeds];
+    let idx = +el.dataset.i;
+    if (!feeds[idx] || feeds[idx].url !== el.dataset.url) idx = feeds.findIndex(f => f.url === el.dataset.url);
+    if (idx < 0) { refreshFeedsUI(); return; }
+    feeds.splice(idx, 1);
+    feedsBusy = true;
+    try {
+      await saveFeeds(feeds);
+      p.feeds = feeds;
+      renderFeedRows(feeds);
+      toast("Calendar removed.");
+    } catch (e) {
+      if (e.status === 409 || e.status === 422) { toast("The calendar list changed on another device — refreshed it, try again."); refreshFeedsUI(); }
+      else toast("Couldn’t save — check your connection.");
+    } finally { feedsBusy = false; }
+  },
   "open-export"() { openSheet("export"); },
   async "sync-connect"() {
     syncDraftInputs();
@@ -2335,6 +2834,7 @@ const ACTIONS = {
   },
   "sync-disconnect"() {
     setGhToken(null); ghSha = null; ghAuthFailed = false;
+    EV = null; evSha = null; evByDateCache = null; evByDateFor = null; feedsSha = null;
     if (mode === "github") mode = "local-only";
     closeSheet();
     toast("Sync disconnected — this device is local-only now");
@@ -2345,7 +2845,7 @@ const ACTIONS = {
     const p = UI.sheet.params;
     const cand = tryHydrate((p.draft.importJson || "").trim());
     if (!cand || cand.future) { toast(cand ? "That backup is from a newer app version." : "That doesn’t look like a WeekWise backup."); return; }
-    if (!p.confirmImport) { p.confirmImport = true; renderSheet(); return; }
+    if (!p.confirmImport) { p.confirmImport = true; renderSheet(); refreshFeedsUI(); return; }
     S = cand.data; futureVersion = false; normalize(S); rev++;
     opLog = []; dirty = true; firstDirtyAt = Date.now(); saveState = "dirty"; scheduleSave(300);
     closeSheet();
@@ -2391,8 +2891,9 @@ document.addEventListener("submit", (e) => {
     const input = form.querySelector("#new-course-name");
     const name = input.value.trim();
     if (!name) return;
+    const cat = form.dataset.cat === "work" ? "work" : "study";
     dispatch({ t: "course.upsert", course: {
-      id: newId("c"), name, colorIndex: S.courses.length % 12, archived: false,
+      id: newId("c"), name, category: cat, colorIndex: S.courses.filter(c => c.category === cat).length % 12, archived: false,
       sortOrder: nextSortOrder(S.courses), createdAt: nowIso(), updatedAt: nowIso(),
     }}, { silent: true });
     renderSheet();
@@ -2418,19 +2919,97 @@ document.addEventListener("change", (e) => {
   } else if (el.matches("[data-course-name]")) {
     const name = el.value.trim();
     if (name) dispatch({ t: "course.patch", id: el.dataset.courseName, patch: { name } }, { silent: true });
+  } else if (el.id === "att-file") {
+    const file = el.files && el.files[0];
+    el.value = "";
+    if (file) handleAttachFile(file);
   }
 });
-document.addEventListener("focusout", (e) => {
-  if (e.target.matches && e.target.matches("[data-summary]")) {
-    summaryPending = { scope: e.target.dataset.summary, week: e.target.dataset.week, text: e.target.value };
-    flushSummary();
-    UI.editingSummary = null;
-    // Defer the re-render until an in-flight tap finishes dispatching its click —
-    // rebuilding the view between mousedown and mouseup would swallow that tap.
-    const finish = () => { clearTimeout(tid); document.removeEventListener("click", finish, true); setTimeout(render, 0); };
-    const tid = setTimeout(finish, 300);
-    document.addEventListener("click", finish, true);
+function renderFeedRows(feeds) {
+  const el = document.getElementById("feeds-list");
+  if (!el) return;
+  el.innerHTML = feeds.length
+    ? feeds.map((f, i) => `<div class="mgr-row" style="min-height:40px">
+        <span style="flex:1;overflow-wrap:anywhere">${esc(f.name || "Calendar")}</span>
+        <button class="btn-quiet" style="color:var(--danger)" data-action="cal-feed-remove" data-i="${i}" data-url="${esc(f.url)}">Remove</button>
+      </div>`).join("")
+    : "No calendars connected yet.";
+}
+async function refreshFeedsUI() {
+  if (mode !== "github") { const el0 = document.getElementById("feeds-list"); if (el0) el0.textContent = "Connect sync to add calendars."; return; }
+  const gen = ++feedsGen;
+  const res = await loadFeeds(gen);
+  if (gen !== feedsGen) return; // a save or newer refresh superseded this response
+  if (UI.sheet?.kind !== "sync") return;
+  if (res.error) {
+    UI.sheet.params.feeds = null; // "not loaded" — the add/remove handlers refuse to write blind
+    const el = document.getElementById("feeds-list");
+    if (el) el.textContent = "Couldn’t load calendars — check your connection.";
+    return;
   }
+  UI.sheet.params.feeds = res.feeds;
+  renderFeedRows(res.feeds);
+}
+async function handleAttachFile(file) {
+  const target = UI.attachTarget; UI.attachTarget = null;
+  if (!target) return;
+  if (!file.type.startsWith("image/")) { toast("Only images can be attached."); return; }
+  toast("Adding image…");
+  try {
+    const { id } = await uploadAttachment(file);
+    if (target.kind === "tasksheet" && UI.sheet?.kind === "task" && UI.sheet.params.draft && UI.sheet.params.draft === target.draft) {
+      syncDraftInputs();
+      (target.draft.images ||= []).push(id);
+      renderSheet(); hydrateThumbs(document.getElementById("sheet-root"));
+      toast("Image added ✓");
+    } else if (target.kind === "summary" && target.scope && parseWeekKey(target.week || "")) {
+      dispatch({ t: "summary.image", weekKey: target.week, scope: target.scope, id, add: true }, { silent: true });
+      render();
+      toast("Image added ✓");
+    }
+    // a mismatched/closed sheet falls through silently: the upload stays as an accepted orphan
+  } catch (err) { toast(err.userMessage || "Couldn’t add the image."); }
+}
+document.addEventListener("paste", (e) => {
+  const file = [...((e.clipboardData && e.clipboardData.files) || [])].find(f => f.type.startsWith("image/"));
+  if (!file) return;
+  if (UI.sheet?.kind === "task") {
+    e.preventDefault();
+    if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
+    UI.attachTarget = { kind: "tasksheet", draft: UI.sheet.params.draft || null };
+    handleAttachFile(file);
+  } else if (UI.editingSummary) {
+    const [scope, week] = UI.editingSummary.split("|");
+    e.preventDefault();
+    if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
+    UI.attachTarget = { kind: "summary", scope, week };
+    handleAttachFile(file);
+  }
+});
+// keep the summary editor's focus when its toolbar is pressed (a blur would close it)
+document.addEventListener("pointerdown", (e) => {
+  if (e.target.closest && e.target.closest('[data-action="md-wrap"], [data-action="att-add-summary"]')) e.preventDefault();
+});
+const MD_TOOLS_SEL = '[data-action="md-wrap"], [data-action="att-add-summary"]';
+function teardownSummaryEditor(ta) {
+  summaryPending = { scope: ta.dataset.summary, week: ta.dataset.week, text: ta.value };
+  flushSummary();
+  UI.editingSummary = null;
+  // Defer the re-render until an in-flight tap finishes dispatching its click —
+  // rebuilding the view between mousedown and mouseup would swallow that tap.
+  const finish = () => { clearTimeout(tid); document.removeEventListener("click", finish, true); setTimeout(render, 0); };
+  const tid = setTimeout(finish, 300);
+  document.addEventListener("click", finish, true);
+}
+document.addEventListener("focusout", (e) => {
+  const fromTextarea = e.target.matches && e.target.matches("[data-summary]");
+  const fromTools = !fromTextarea && e.target.closest && e.target.closest(".md-tools");
+  if (!fromTextarea && !fromTools) return;
+  const ta = fromTextarea ? e.target : document.querySelector("#view textarea[data-summary]");
+  if (!ta) return;
+  // moving between the textarea and its toolbar keeps the editor open (keyboard access)
+  if (e.relatedTarget && e.relatedTarget.closest && (e.relatedTarget === ta || e.relatedTarget.closest(MD_TOOLS_SEL))) return;
+  teardownSummaryEditor(ta);
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && UI.sheet) { closeSheet(); return; }
@@ -2504,6 +3083,7 @@ function render() {
     const el = document.querySelector(focusSel);
     if (el && !sheetRoot.contains(el)) el.focus({ preventScroll: true });
   }
+  hydrateThumbs(document.getElementById("view"));
   updateChrome();
 }
 function applyPendingDrafts() {
