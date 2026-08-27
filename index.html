@@ -1,0 +1,2528 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<title>WeekWise</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* ================= tokens ================= */
+:root {
+  color-scheme: light;
+  --bg:#f6f6f9; --surface:#ffffff; --surface-2:#f0f0f4; --surface-3:#e4e4ea;
+  --border:#e3e3ea; --card-border:transparent;
+  --text:#1d1d24; --text-2:#5f5f6b; --text-3:#9797a3;
+  --ink:#23232b; --on-ink:#ffffff;
+  --cat-study:#6366f1; --cat-study-soft:#e9e9fd; --cat-study-deep:#4548c8;
+  --cat-work:#0d9488; --cat-work-soft:#ddf1ee; --cat-work-deep:#0b6e66;
+  --cat-personal:#d97706; --cat-personal-soft:#f9ecda; --cat-personal-deep:#9d5804;
+  --success:#188647; --success-soft:#e0f2e7;
+  --danger:#c93030; --danger-soft:#fbe9e9;
+  --sw-0:#6366f1; --sw-1:#0ea5e9; --sw-2:#0d9488; --sw-3:#16a34a;
+  --sw-4:#ca8a04; --sw-5:#d97706; --sw-6:#dc2626; --sw-7:#db2777;
+  --sw-8:#9333ea; --sw-9:#64748b; --sw-10:#7c3aed; --sw-11:#0891b2;
+  --shadow:0 1px 2px rgb(24 24 36 / .05), 0 4px 14px rgb(24 24 36 / .06);
+  --sheet-shadow:0 -8px 40px rgb(24 24 36 / .18);
+  --r-sm:7px; --r-md:11px; --r-lg:15px;
+  --font-ui:"Instrument Sans", "Segoe UI", -apple-system, system-ui, sans-serif;
+  --font-display:"Sora", "Segoe UI", -apple-system, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:#141419; --surface:#1d1d23; --surface-2:#26262e; --surface-3:#32323c;
+    --border:#2e2e37; --card-border:#2e2e37;
+    --text:#ebebf0; --text-2:#a5a5b1; --text-3:#71717d;
+    --ink:#e8e8ef; --on-ink:#1a1a20;
+    --cat-study:#6366f1; --cat-study-soft:#2c2c52; --cat-study-deep:#a5a7f9;
+    --cat-work:#0d9488; --cat-work-soft:#123531; --cat-work-deep:#4fd4c5;
+    --cat-personal:#d97706; --cat-personal-soft:#3f2d12; --cat-personal-deep:#f3a94e;
+    --success:#3fbf74; --success-soft:#15321f;
+    --danger:#ef6a6a; --danger-soft:#3d1d1d;
+    --sw-0:#8b8df8; --sw-1:#38bdf8; --sw-2:#2dd4bf; --sw-3:#4ade80;
+    --sw-4:#facc15; --sw-5:#fb923c; --sw-6:#f87171; --sw-7:#f472b6;
+    --sw-8:#c084fc; --sw-9:#94a3b8; --sw-10:#a78bfa; --sw-11:#22d3ee;
+    --shadow:none; --sheet-shadow:0 -8px 40px rgb(0 0 0 / .5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#141419; --surface:#1d1d23; --surface-2:#26262e; --surface-3:#32323c;
+  --border:#2e2e37; --card-border:#2e2e37;
+  --text:#ebebf0; --text-2:#a5a5b1; --text-3:#71717d;
+  --ink:#e8e8ef; --on-ink:#1a1a20;
+  --cat-study:#6366f1; --cat-study-soft:#2c2c52; --cat-study-deep:#a5a7f9;
+  --cat-work:#0d9488; --cat-work-soft:#123531; --cat-work-deep:#4fd4c5;
+  --cat-personal:#d97706; --cat-personal-soft:#3f2d12; --cat-personal-deep:#f3a94e;
+  --success:#3fbf74; --success-soft:#15321f;
+  --danger:#ef6a6a; --danger-soft:#3d1d1d;
+  --sw-0:#8b8df8; --sw-1:#38bdf8; --sw-2:#2dd4bf; --sw-3:#4ade80;
+  --sw-4:#facc15; --sw-5:#fb923c; --sw-6:#f87171; --sw-7:#f472b6;
+  --sw-8:#c084fc; --sw-9:#94a3b8; --sw-10:#a78bfa; --sw-11:#22d3ee;
+  --shadow:none; --sheet-shadow:0 -8px 40px rgb(0 0 0 / .5);
+}
+
+/* ================= base ================= */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 400 14.5px/1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
+h1, h2, h3, p { margin: 0; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+::placeholder { color: var(--text-3); opacity: 1; }
+
+/* ================= app layout ================= */
+#app { min-height: 100dvh; display: flex; flex-direction: column; }
+#main { flex: 1; width: 100%; max-width: 660px; margin-inline: auto; padding: 14px 16px calc(84px + env(safe-area-inset-bottom)); }
+#sidebar { display: none; }
+
+#topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; min-height: 34px; }
+.view-title { font: 700 21px/1.25 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+
+/* bottom tab bar (mobile) */
+#tabbar {
+  position: fixed; inset-inline: 0; bottom: 0; z-index: 40;
+  display: flex; background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+#tabbar button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 0 6px; color: var(--text-2); font-size: 10.5px; font-weight: 500;
+}
+#tabbar button svg { width: 23px; height: 23px; }
+#tabbar button[aria-current="true"] { color: var(--text); font-weight: 600; }
+
+@media (min-width: 900px) {
+  #app { flex-direction: row; }
+  #tabbar { display: none; }
+  #sidebar {
+    display: flex; flex-direction: column; gap: 4px;
+    width: 226px; flex-shrink: 0; position: sticky; top: 0; height: 100dvh;
+    padding: 22px 14px; border-right: 1px solid var(--border); background: var(--surface);
+  }
+  #main { max-width: 1060px; padding: 26px 36px 60px; }
+  .wordmark { font: 700 19px/1 var(--font-display); letter-spacing: -0.02em; padding: 2px 10px 18px; display: flex; align-items: baseline; gap: 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 10px; border-radius: var(--r-sm);
+    color: var(--text-2); font-weight: 500; font-size: 14px; text-align: left;
+  }
+  .nav-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--surface-2); color: var(--text); }
+  .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: 600; }
+  .nav-section { font-size: 10.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-3); padding: 16px 10px 5px; }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-inline: 5px 0; }
+}
+
+/* ================= shared components ================= */
+.card {
+  background: var(--surface); border-radius: var(--r-md);
+  border: 1px solid var(--card-border); box-shadow: var(--shadow);
+  padding: 15px 16px;
+}
+@media (min-width: 900px) { .card { padding: 18px 20px; } }
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-3); margin: 22px 2px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.stack { display: flex; flex-direction: column; gap: 10px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 40px; padding: 0 16px; border-radius: var(--r-sm);
+  font-weight: 600; font-size: 14px;
+}
+.btn-primary { background: var(--ink); color: var(--on-ink); }
+.btn-primary:active { transform: scale(.97); }
+.btn-ghost { background: var(--surface-2); color: var(--text); }
+.btn-ghost:active { transform: scale(.97); }
+.btn-quiet { color: var(--text-2); font-weight: 500; min-height: 36px; padding: 0 10px; border-radius: var(--r-sm); }
+.btn-quiet:hover { background: var(--surface-2); }
+.btn-danger { color: var(--danger); font-weight: 600; min-height: 40px; padding: 0 12px; border-radius: var(--r-sm); }
+.btn-danger:hover { background: var(--danger-soft); }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--r-sm); color: var(--text-2); }
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn svg { width: 19px; height: 19px; }
+
+/* segmented control */
+.seg { display: flex; background: var(--surface-2); border-radius: 999px; padding: 3px; position: relative; }
+.seg button {
+  flex: 1; position: relative; z-index: 1; min-height: 36px; border-radius: 999px;
+  font-weight: 500; font-size: 13.5px; color: var(--text-2); border: 1px solid transparent;
+}
+.seg button[aria-current="true"] { color: var(--text); font-weight: 600; background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--card-border); }
+@media (min-width: 900px) { .seg-planner { display: none; } }
+
+/* week bar */
+.weekbar {
+  position: sticky; top: 0; z-index: 30; background: var(--bg);
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 0; margin: 2px 0 4px;
+}
+.weekbar-label { flex: 1; text-align: center; font: 600 15px/1.3 var(--font-display); border-radius: var(--r-sm); min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.weekbar-label:hover { background: var(--surface-2); }
+.weekbar-label .sub { font: 500 11.5px/1.2 var(--font-ui); color: var(--text-3); }
+.weekbar-label.elsewhere { box-shadow: inset 0 -2px 0 var(--ink); }
+.weekbar .today-btn { font-size: 12.5px; font-weight: 600; min-height: 34px; padding: 0 12px; border-radius: 999px; background: var(--surface-3); }
+
+/* list rows */
+.rows { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; gap: 11px; min-height: 50px; padding: 5px 2px; border-radius: var(--r-sm); }
+.row + .row { border-top: 1px solid var(--border); }
+.row-main { flex: 1; min-width: 0; text-align: left; padding: 4px 0; }
+.row-title { font-weight: 500; font-size: 14.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); margin-top: 1px; overflow-wrap: anywhere; }
+.row.done .row-title { color: var(--text-3); text-decoration: line-through; text-decoration-thickness: 1px; }
+.row.done { opacity: .78; }
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.deadline-mark { font-size: 10px; }
+.date-chip { font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.date-chip.overdue { background: var(--danger-soft); color: var(--danger); }
+
+/* checkbox */
+.check {
+  width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+  border: 2px solid var(--text-3); background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.check::after { content: ""; position: absolute; inset: -10px; }
+.check svg { width: 14px; height: 14px; stroke: var(--on-ink); stroke-width: 3; fill: none; opacity: 0; }
+.check[aria-pressed="true"] { border-color: transparent; }
+.check[aria-pressed="true"] svg { opacity: 1; stroke-dasharray: 20; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .check[aria-pressed="true"] svg { animation: checkdraw 200ms ease-out; }
+  @keyframes checkdraw { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+}
+
+/* quick add */
+.quick-add { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r-md); padding: 3px 6px 3px 14px; }
+.quick-add input { flex: 1; border: 0; background: none; min-height: 44px; font-size: 14.5px; min-width: 0; }
+.quick-add input:focus { outline: none; }
+.quick-add:focus-within { border-style: solid; border-color: var(--text-3); }
+
+/* banners */
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--r-md); font-size: 13px; font-weight: 500; margin: 10px 0; }
+.banner-warn { background: var(--danger-soft); color: var(--danger); }
+.banner-info { background: var(--surface-3); color: var(--text-2); }
+.banner .spacer { flex: 1; }
+.banner button { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; color: inherit; min-height: 32px; }
+
+/* save chip */
+#save-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-3); min-height: 34px; padding: 0 10px; border-radius: 999px; }
+#save-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); }
+#save-chip.st-saved .dot { background: var(--success); }
+#save-chip.st-saving .dot { background: var(--cat-personal); }
+#save-chip.st-error { color: var(--danger); } #save-chip.st-error .dot { background: var(--danger); }
+@media (prefers-reduced-motion: no-preference) {
+  #save-chip.st-saving .dot { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+}
+@media (max-width: 899px) { #save-chip .chip-text { display: none; } #save-chip.st-error .chip-text, #save-chip.st-local .chip-text, #save-chip.st-readonly .chip-text { display: inline; } }
+
+/* home */
+.home-date { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.ring-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ring-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px 12px; background: var(--surface); border: 1px solid var(--card-border); border-radius: var(--r-md); box-shadow: var(--shadow); }
+.ring-card .lbl { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.habit-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.hchip { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); font-weight: 500; font-size: 13.5px; max-width: 100%; overflow-wrap: anywhere; }
+.hchip[aria-pressed="true"] { background: var(--success-soft); border-color: transparent; color: var(--text); }
+.hchip .hdot { width: 9px; height: 9px; border-radius: 50%; }
+.hchip[aria-pressed="true"] .hdot { background: var(--success) !important; }
+.anytime-toggle { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 42px; color: var(--text-2); font-size: 13px; font-weight: 500; padding: 0 2px; }
+.anytime-toggle .chev { transition: transform 150ms; } .anytime-toggle.open .chev { transform: rotate(90deg); }
+@media (min-width: 900px) {
+  .home-grid { display: grid; grid-template-columns: 7fr 5fr; gap: 22px; align-items: start; }
+}
+
+/* course card */
+.course-card { border-left: 3px solid var(--surface-3); }
+.course-head { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; min-height: 34px; }
+.course-name { font: 600 15.5px/1.3 var(--font-display); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.course-count { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ghost-add { display: flex; align-items: center; gap: 9px; min-height: 42px; color: var(--text-3); font-size: 13.5px; width: 100%; text-align: left; border-radius: var(--r-sm); padding: 0 2px; }
+.ghost-add:hover { color: var(--text-2); }
+.summary-block { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+.summary-block .lbl { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+.summary-preview { width: 100%; text-align: left; font-size: 13.5px; color: var(--text-2); line-height: 1.5; border-radius: var(--r-sm); padding: 4px 2px; overflow-wrap: anywhere; }
+.summary-preview.empty { color: var(--text-3); font-style: italic; }
+.summary-edit { width: 100%; border: 0; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13.5px; line-height: 1.5; resize: none; display: block; }
+.summary-edit:focus { outline: 2px solid var(--ink); outline-offset: 0; }
+
+/* insights */
+.insights-toggle { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; font-size: 13.5px; color: var(--text-2); }
+.insights-toggle .chev { transition: transform 150ms; } .insights-toggle.open .chev { transform: rotate(90deg); }
+.insights-body { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: center; padding: 6px 0 4px; }
+
+/* charts */
+.chart-wrap { width: 100%; }
+.chart-wrap svg { width: 100%; height: auto; display: block; }
+.chart-caption { font-size: 12px; color: var(--text-2); min-height: 18px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); }
+.legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.svg-num { font: 700 10px var(--font-display); fill: var(--text); }
+.svg-lbl { font: 500 8.5px var(--font-ui); fill: var(--text-2); }
+.svg-lbl.now { font-weight: 600; fill: var(--text); }
+
+/* calendar */
+.cal-head { display: flex; align-items: center; gap: 4px; margin: 6px 0 10px; }
+.cal-title { flex: 1; text-align: center; font: 600 16px/1.2 var(--font-display); }
+.cal-grid { display: grid; grid-template-columns: 26px repeat(7, minmax(0, 1fr)); gap: 3px; }
+.cal-dow { font-size: 10.5px; font-weight: 600; color: var(--text-2); text-align: center; padding: 4px 0; text-transform: uppercase; letter-spacing: .04em; }
+.cal-wk { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--text-3); border-radius: 6px; font-variant-numeric: tabular-nums; }
+.cal-wk:hover { background: var(--surface-2); color: var(--text); }
+.cal-cell {
+  background: var(--surface); border: 1px solid var(--card-border); box-shadow: var(--shadow);
+  border-radius: 8px; padding: 4px 3px; min-height: 52px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; overflow: hidden;
+}
+.cal-cell.out { background: none; box-shadow: none; border-color: transparent; }
+.cal-cell.out .cal-num { color: var(--text-3); opacity: .55; }
+.cal-cell.selected { outline: 2px solid var(--ink); outline-offset: -1px; }
+.cal-num { font-size: 11.5px; font-weight: 600; align-self: center; width: 21px; height: 21px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-variant-numeric: tabular-nums; }
+.cal-cell.today .cal-num { background: var(--ink); color: var(--on-ink); }
+.cal-dots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; padding-bottom: 2px; }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; }
+.cal-dot.diamond { border-radius: 1.5px; transform: rotate(45deg); }
+.cal-dot.done { opacity: .35; }
+.cal-more { font-size: 9px; color: var(--text-3); line-height: 6px; }
+.cal-pills { display: none; }
+@media (min-width: 900px) {
+  .cal-grid { gap: 5px; grid-template-columns: 34px repeat(7, minmax(0, 1fr)); }
+  .cal-cell { min-height: 96px; padding: 6px; }
+  .cal-num { align-self: flex-end; }
+  .cal-dots { display: none; }
+  .cal-pills { display: flex; flex-direction: column; gap: 3px; }
+  .cal-pill { font-size: 11px; font-weight: 500; line-height: 1.35; padding: 2px 7px; border-radius: 5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .cal-pill.done { opacity: .5; text-decoration: line-through; }
+  .cal-pill-more { font-size: 10.5px; color: var(--text-3); padding: 0 7px; text-align: left; }
+}
+.cal-empty-note { text-align: center; font-size: 12.5px; color: var(--text-3); margin-top: 14px; }
+
+/* habits */
+.habit-card .hd { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.habit-name { font: 600 15.5px/1.3 var(--font-display); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.habit-stats { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.streak { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: var(--cat-personal-deep); }
+.habit-days { display: flex; justify-content: space-between; margin-top: 10px; }
+.hday { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 40px; }
+.hday .dlbl { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; }
+.hday.today .dlbl { color: var(--text); }
+.hcell {
+  width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center; position: relative;
+}
+.hcell::after { content: ""; position: absolute; inset: -6px; }
+.hcell svg { width: 16px; height: 16px; stroke: var(--on-ink); stroke-width: 3; fill: none; opacity: 0; }
+.hcell[aria-pressed="true"] { background: var(--success); border-color: var(--success); }
+.hcell[aria-pressed="true"] svg { opacity: 1; }
+.hcell:disabled { opacity: .38; cursor: default; }
+.hcell.today { box-shadow: 0 0 0 3px var(--surface-3); }
+@media (prefers-reduced-motion: no-preference) {
+  .hcell[aria-pressed="true"] { animation: pop 200ms ease-out; }
+  @keyframes pop { 50% { transform: scale(1.14); } }
+}
+.goal-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.goal-segs { flex: 1; display: flex; gap: 4px; }
+.goal-segs i { flex: 1; height: 7px; border-radius: 4px; background: var(--surface-3); }
+.goal-segs i.on { background: var(--success); }
+.goal-segs i.extra { background: var(--success); opacity: .55; }
+.plus-btn { width: 42px; height: 42px; border-radius: 50%; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; color: var(--text-2); flex-shrink: 0; }
+.plus-btn:hover { background: var(--surface-3); color: var(--text); }
+.plus-btn:disabled { opacity: .35; cursor: default; }
+.habit-detail { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
+.dotmatrix { display: grid; grid-template-columns: repeat(7, 12px); gap: 4px; }
+.dotmatrix i { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-3); }
+.dotmatrix i.on { background: var(--success); }
+.dotmatrix i.na { opacity: .3; }
+
+/* sheet / modal */
+#sheet-root { position: fixed; inset: 0; z-index: 100; display: none; }
+#sheet-root.open { display: block; }
+.backdrop { position: absolute; inset: 0; background: rgb(10 10 16 / .44); }
+.sheet {
+  position: absolute; inset-inline: 0; bottom: 0; max-height: 88dvh; overflow-y: auto;
+  background: var(--surface); border-radius: 16px 16px 0 0; box-shadow: var(--sheet-shadow);
+  padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
+}
+.sheet-grip { width: 38px; height: 4px; border-radius: 2px; background: var(--surface-3); margin: 6px auto 12px; }
+.sheet h2 { font: 600 17px/1.3 var(--font-display); margin-bottom: 14px; }
+@media (min-width: 900px) {
+  .sheet { inset: 50% auto auto 50%; transform: translate(-50%, -50%); bottom: auto; width: 460px; border-radius: var(--r-lg); max-height: 86dvh; padding: 20px 22px; }
+  .sheet-grip { display: none; }
+}
+@media (max-width: 899px) {
+  /* on-screen keyboard escape hatch: give the sheet's own scroller room below the focused field */
+  .sheet:has(input:focus, textarea:focus) { padding-bottom: 42dvh; scroll-padding-bottom: 30dvh; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  #sheet-root.open .sheet { animation: sheetup 220ms cubic-bezier(.32,.72,.32,1); }
+  #sheet-root.open .backdrop { animation: fadein 180ms ease-out; }
+  @keyframes sheetup { from { transform: translateY(40px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes fadein { from { opacity: 0; } }
+  @media (min-width: 900px) {
+    #sheet-root.open .sheet { animation: modalin 160ms ease-out; }
+    @keyframes modalin { from { transform: translate(-50%, -48%); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+  }
+}
+.field { margin-bottom: 14px; }
+.field > label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.text-input {
+  width: 100%; border: 1.5px solid var(--border); background: var(--surface);
+  border-radius: var(--r-sm); min-height: 44px; padding: 8px 12px; font-size: 15px; display: block;
+}
+.text-input:focus { outline: none; border-color: var(--ink); }
+textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px;
+  border-radius: 999px; background: var(--surface-2); font-size: 13px; font-weight: 500; color: var(--text-2);
+  border: 1.5px solid transparent; max-width: 100%; overflow-wrap: anywhere;
+}
+.chip[aria-pressed="true"] { background: var(--surface); border-color: var(--ink); color: var(--text); font-weight: 600; }
+.chip .cdot { width: 8px; height: 8px; border-radius: 50%; }
+.chip small { font-weight: 400; font-size: 11px; color: var(--text-3); }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.switch-row .lbl { font-size: 14px; font-weight: 500; }
+.switch-row .sub { font-size: 12px; color: var(--text-3); }
+.switch { width: 44px; height: 26px; border-radius: 13px; background: var(--surface-3); position: relative; flex-shrink: 0; transition: background 150ms; }
+.switch::before { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .25); transition: transform 150ms; }
+.switch[aria-pressed="true"] { background: var(--success); }
+.switch[aria-pressed="true"]::before { transform: translateX(18px); }
+.sheet-footer { display: flex; gap: 10px; margin-top: 18px; }
+.sheet-footer .btn-primary { flex: 1; }
+.swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid transparent; position: relative; }
+.swatch[aria-pressed="true"] { border-color: var(--ink); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+.stepper button { width: 36px; height: 36px; border-radius: 50%; font-size: 17px; font-weight: 600; color: var(--text-2); }
+.stepper button:hover { background: var(--surface-3); }
+.stepper .val { min-width: 74px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* course manager rows */
+.mgr-row { display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.mgr-row + .mgr-row { border-top: 1px solid var(--border); }
+.mgr-row input { flex: 1; border: 0; background: none; min-height: 44px; font-size: 14.5px; font-weight: 500; min-width: 0; }
+.mgr-row input:focus { outline: none; box-shadow: inset 0 -2px 0 var(--ink); }
+.color-dot-btn { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; border: 2px solid var(--border); }
+
+/* toast */
+#toast-root { position: fixed; inset-inline: 0; bottom: calc(70px + env(safe-area-inset-bottom)); display: flex; justify-content: center; z-index: 200; pointer-events: none; padding: 0 16px; }
+@media (min-width: 900px) { #toast-root { bottom: 28px; } }
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 14px;
+  background: var(--ink); color: var(--on-ink); border-radius: var(--r-md);
+  padding: 11px 16px; font-size: 13.5px; font-weight: 500; box-shadow: 0 6px 24px rgb(0 0 0 / .25);
+  max-width: 420px;
+}
+.toast button { color: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toastup 200ms ease-out; }
+  @keyframes toastup { from { transform: translateY(14px); opacity: 0; } }
+}
+
+/* empty states */
+.empty { text-align: center; padding: 26px 18px; color: var(--text-3); font-size: 13.5px; }
+.empty .big { font-size: 14.5px; color: var(--text-2); font-weight: 500; margin-bottom: 4px; }
+.empty .btn { margin-top: 12px; }
+.welcome-step { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.welcome-step + .welcome-step { border-top: 1px solid var(--border); }
+.welcome-step .num { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-3); display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; flex-shrink: 0; font-family: var(--font-display); }
+.welcome-step.done .num { background: var(--success); color: var(--on-ink); }
+.welcome-step .t { flex: 1; font-weight: 500; }
+.welcome-step .btn-ghost { min-height: 34px; font-size: 12.5px; padding: 0 12px; }
+
+/* misc */
+.hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
+.home-col { display: flex; flex-direction: column; min-width: 0; }
+.cal-dow .l3 { display: none; }
+@media (min-width: 900px) { .cal-dow .l1 { display: none; } .cal-dow .l3 { display: inline; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div id="app">
+  <aside id="sidebar" aria-label="Navigation"></aside>
+  <div id="main">
+    <header id="topbar">
+      <h1 class="view-title" id="page-title">Home</h1>
+      <button id="save-chip" type="button" title="Sync status"><span class="dot"></span><span class="chip-text"></span></button>
+    </header>
+    <div id="banner-slot"></div>
+    <main id="view"></main>
+  </div>
+  <nav id="tabbar" aria-label="Navigation"></nav>
+</div>
+<div id="sheet-root"></div>
+<div id="toast-root"></div>
+
+<script id="seed-data" type="application/json">{"schemaVersion":1,"meta":{"seq":0,"lastSavedAt":null,"lastSavedBy":null,"createdAt":null},"settings":{},"courses":[],"tasks":[],"recurringTemplates":[],"weeklySummaries":{},"habits":[],"habitLog":{},"history":{}}</script>
+
+<script>
+"use strict";
+/* ============================================================
+   isoweek — all local time; day stepping via setDate (DST-safe)
+   ============================================================ */
+function localMidnight(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function isoDow(d) { return (d.getDay() + 6) % 7; } // 0=Mon .. 6=Sun
+function isoWeekOf(dateLike) {
+  const t = localMidnight(dateLike instanceof Date ? dateLike : parseDateKey(dateLike));
+  t.setDate(t.getDate() - isoDow(t) + 3);
+  const isoYear = t.getFullYear();
+  const jan4 = new Date(isoYear, 0, 4);
+  const mondayW1 = new Date(isoYear, 0, 4 - isoDow(jan4));
+  const week = Math.round((t - mondayW1) / 604800000) + 1;
+  return { year: isoYear, week };
+}
+function weekKeyOf(dateLike) {
+  const { year, week } = isoWeekOf(dateLike);
+  return year + "-W" + String(week).padStart(2, "0");
+}
+function parseWeekKey(k) {
+  const m = /^(\d{4})-W(\d{2})$/.exec(k);
+  return m ? { year: +m[1], week: +m[2] } : null;
+}
+function compareWeekKeys(a, b) {
+  const A = parseWeekKey(a), B = parseWeekKey(b);
+  if (!A || !B) return A ? 1 : B ? -1 : 0;
+  return (A.year - B.year) || (A.week - B.week);
+}
+function mondayOfWeek(weekKey) {
+  const parsed = parseWeekKey(weekKey) || isoWeekOf(new Date());
+  const { year, week } = parsed;
+  const jan4 = new Date(year, 0, 4);
+  const mondayW1 = new Date(year, 0, 4 - isoDow(jan4));
+  return new Date(mondayW1.getFullYear(), mondayW1.getMonth(), mondayW1.getDate() + (week - 1) * 7);
+}
+function weekDates(weekKey) {
+  const mon = mondayOfWeek(weekKey);
+  return Array.from({ length: 7 }, (_, i) => new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i));
+}
+function addWeeks(weekKey, n) {
+  const mon = mondayOfWeek(weekKey);
+  return weekKeyOf(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 7 * n));
+}
+function dateKeyOf(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function parseDateKey(k) { const [y, m, d] = String(k).split("-").map(Number); return new Date(y, m - 1, d); }
+function todayKey() { return dateKeyOf(new Date()); }
+function currentWeekKey() { return weekKeyOf(new Date()); }
+function addDaysKey(dateKey, n) { const d = parseDateKey(dateKey); return dateKeyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); }
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MON3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const DAY3 = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function weekRangeLabel(weekKey) {
+  const ds = weekDates(weekKey), a = ds[0], b = ds[6];
+  const left = a.getMonth() === b.getMonth() ? String(a.getDate()) : a.getDate() + " " + MON3[a.getMonth()];
+  return left + " – " + b.getDate() + " " + MON3[b.getMonth()];
+}
+function fmtDateShort(dateKey) { const d = parseDateKey(dateKey); return DAY3[isoDow(d)] + " " + d.getDate() + " " + MON3[d.getMonth()]; }
+function fmtDayNum(dateKey) { const d = parseDateKey(dateKey); return DAY3[isoDow(d)] + " " + d.getDate(); }
+
+/* ============================================================
+   ids
+   ============================================================ */
+function rand36(n) {
+  const a = new Uint32Array(n); crypto.getRandomValues(a);
+  let s = ""; for (const x of a) s += (x % 36).toString(36); return s;
+}
+const deviceId = (() => {
+  try {
+    let v = localStorage.getItem("planner.deviceId");
+    if (!v) { v = "dev_" + rand36(8); localStorage.setItem("planner.deviceId", v); }
+    return v;
+  } catch { return "dev_" + rand36(8); }
+})();
+function newId(prefix) { return prefix + "_" + Date.now().toString(36) + "_" + rand36(8); }
+function nowIso() { return new Date().toISOString(); }
+
+/* ============================================================
+   store — state, dispatch funnel, normalize/migrate, queries
+   ============================================================ */
+const CURRENT_SCHEMA = 1;
+const CATS = ["study", "work", "personal"];
+const CAT_LABEL = { study: "Study", work: "Work", personal: "Personal" };
+
+let S = null;          // persisted document
+let rev = 0;           // bumped on every mutation
+let opLog = [];        // ops since last successful save (for conflict stash)
+let futureVersion = false;
+
+function emptyState() {
+  return {
+    schemaVersion: CURRENT_SCHEMA,
+    meta: { seq: 0, lastSavedAt: null, lastSavedBy: null, createdAt: nowIso() },
+    settings: {},
+    courses: [], tasks: [], recurringTemplates: [],
+    weeklySummaries: {}, habits: [], habitLog: {}, history: {},
+  };
+}
+function normalize(d) {
+  const base = emptyState();
+  for (const k of Object.keys(base)) if (d[k] == null) d[k] = base[k];
+  if (typeof d.meta.seq !== "number" || !isFinite(d.meta.seq)) d.meta.seq = 0;
+  d.courses = (Array.isArray(d.courses) ? d.courses : []).filter(c => c && c.id);
+  for (const c of d.courses) {
+    c.name = String(c.name ?? "Course"); c.colorIndex = Number.isInteger(c.colorIndex) ? ((c.colorIndex % 12) + 12) % 12 : 0;
+    c.archived = !!c.archived; c.sortOrder = typeof c.sortOrder === "number" ? c.sortOrder : 100;
+    c.createdAt = c.createdAt || nowIso(); c.updatedAt = c.updatedAt || c.createdAt;
+  }
+  d.tasks = (Array.isArray(d.tasks) ? d.tasks : []).filter(t => t && t.id);
+  for (const t of d.tasks) {
+    t.title = String(t.title ?? "");
+    if (!CATS.includes(t.category)) t.category = "personal";
+    t.courseId = t.category === "study" ? (t.courseId || null) : null;
+    t.label = t.label || null;
+    t.dueDate = /^\d{4}-\d{2}-\d{2}$/.test(t.dueDate || "") ? t.dueDate : null;
+    if (t.dueDate && isNaN(parseDateKey(t.dueDate).getTime())) t.dueDate = null;
+    if (t.dueDate) t.weekKey = weekKeyOf(parseDateKey(t.dueDate));
+    else if (!parseWeekKey(t.weekKey || "")) t.weekKey = currentWeekKey();
+    t.isDeadline = !!t.isDeadline;
+    t.status = t.status === "done" ? "done" : "open";
+    t.doneAt = t.status === "done" ? (t.doneAt || nowIso()) : null;
+    t.notes = String(t.notes ?? ""); t.templateId = t.templateId || null;
+    t.sortOrder = typeof t.sortOrder === "number" ? t.sortOrder : 100;
+    t.createdAt = t.createdAt || nowIso(); t.updatedAt = t.updatedAt || t.createdAt;
+  }
+  d.recurringTemplates = (Array.isArray(d.recurringTemplates) ? d.recurringTemplates : []).filter(r => r && r.id);
+  for (const r of d.recurringTemplates) {
+    r.title = String(r.title ?? ""); if (!CATS.includes(r.category)) r.category = "work";
+    r.courseId = r.category === "study" ? (r.courseId || null) : null;
+    r.label = r.label || null; r.notes = String(r.notes ?? "");
+    if (!parseWeekKey(r.fromWeek || "")) r.fromWeek = currentWeekKey();
+    r.untilWeek = parseWeekKey(r.untilWeek || "") ? r.untilWeek : null;
+    r.skipWeeks = Array.isArray(r.skipWeeks) ? r.skipWeeks : [];
+    r.archived = !!r.archived; r.sortOrder = typeof r.sortOrder === "number" ? r.sortOrder : 100;
+    r.createdAt = r.createdAt || nowIso(); r.updatedAt = r.updatedAt || r.createdAt;
+  }
+  if (typeof d.weeklySummaries !== "object" || Array.isArray(d.weeklySummaries)) d.weeklySummaries = {};
+  d.habits = (Array.isArray(d.habits) ? d.habits : []).filter(h => h && h.id);
+  for (const h of d.habits) {
+    h.kind = h.kind === "weekly" ? "weekly" : "daily";
+    h.name = String(h.name ?? "Habit");
+    h.colorIndex = Number.isInteger(h.colorIndex) ? ((h.colorIndex % 12) + 12) % 12 : 3;
+    h.activeDays = Array.isArray(h.activeDays) && h.activeDays.length ? h.activeDays.filter(n => n >= 1 && n <= 7) : [1,2,3,4,5,6,7];
+    h.weeklyTarget = h.kind === "weekly" ? Math.max(1, Math.min(14, h.weeklyTarget | 0 || 3)) : null;
+    h.startDate = /^\d{4}-\d{2}-\d{2}$/.test(h.startDate || "") ? h.startDate : todayKey();
+    h.archived = !!h.archived; h.sortOrder = typeof h.sortOrder === "number" ? h.sortOrder : 100;
+    h.createdAt = h.createdAt || nowIso(); h.updatedAt = h.updatedAt || h.createdAt;
+  }
+  if (typeof d.habitLog !== "object" || d.habitLog === null || Array.isArray(d.habitLog)) d.habitLog = {};
+  const cleanLog = {};
+  for (const [hid, days] of Object.entries(d.habitLog)) {
+    if (!days || typeof days !== "object" || Array.isArray(days)) continue;
+    const cd = {};
+    for (const [k, v] of Object.entries(days)) {
+      const n = Math.floor(Number(v));
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(n) && n > 0) cd[k] = n;
+    }
+    if (Object.keys(cd).length) cleanLog[hid] = cd;
+  }
+  d.habitLog = cleanLog;
+  if (typeof d.history !== "object" || Array.isArray(d.history)) d.history = {};
+  return d;
+}
+const MIGRATIONS = { /* 1: (d) => { ...to v2...; d.schemaVersion = 2; } */ };
+function migrate(d) {
+  if (typeof d.schemaVersion !== "number") throw new Error("invalid_data");
+  if (d.schemaVersion > CURRENT_SCHEMA) { futureVersion = true; return normalize(d); }
+  while (d.schemaVersion < CURRENT_SCHEMA) MIGRATIONS[d.schemaVersion](d);
+  return normalize(d);
+}
+
+/* ---- op application (used by dispatch AND stash replay) ---- */
+function findById(arr, id) { return arr.find(x => x.id === id); }
+function apply(op) {
+  switch (op.t) {
+    case "task.upsert": {
+      const ex = findById(S.tasks, op.task.id);
+      if (ex) Object.assign(ex, op.task, { updatedAt: nowIso() });
+      else S.tasks.push({ ...op.task });
+      break;
+    }
+    case "task.patch": {
+      const t = findById(S.tasks, op.id); if (!t) return false;
+      Object.assign(t, op.patch, { updatedAt: nowIso() });
+      if (op.patch.dueDate) t.weekKey = weekKeyOf(parseDateKey(op.patch.dueDate));
+      break;
+    }
+    case "task.delete": {
+      const i = S.tasks.findIndex(t => t.id === op.id); if (i < 0) return false;
+      S.tasks.splice(i, 1);
+      if (op.templateId && op.weekKey) {
+        const r = findById(S.recurringTemplates, op.templateId);
+        if (r && !r.skipWeeks.includes(op.weekKey)) r.skipWeeks.push(op.weekKey);
+      }
+      break;
+    }
+    case "course.upsert": {
+      const ex = findById(S.courses, op.course.id);
+      if (ex) Object.assign(ex, op.course, { updatedAt: nowIso() });
+      else S.courses.push({ ...op.course });
+      break;
+    }
+    case "course.patch": {
+      const c = findById(S.courses, op.id); if (!c) return false;
+      Object.assign(c, op.patch, { updatedAt: nowIso() });
+      break;
+    }
+    case "course.delete": {
+      const i = S.courses.findIndex(c => c.id === op.id); if (i < 0) return false;
+      if (S.tasks.some(t => t.courseId === op.id) ||
+          S.recurringTemplates.some(r => r.courseId === op.id)) return false; // referenced: refuse
+      S.courses.splice(i, 1);
+      break;
+    }
+    case "template.upsert": {
+      const ex = findById(S.recurringTemplates, op.template.id);
+      if (ex) Object.assign(ex, op.template, { updatedAt: nowIso() });
+      else S.recurringTemplates.push({ ...op.template });
+      break;
+    }
+    case "template.patch": {
+      const r = findById(S.recurringTemplates, op.id); if (!r) return false;
+      Object.assign(r, op.patch, { updatedAt: nowIso() });
+      break;
+    }
+    case "summary.set": {
+      const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
+      w.courses ||= {};
+      const entry = { text: op.text, updatedAt: nowIso() };
+      if (op.scope === "work" || op.scope === "personal") {
+        if (op.text.trim()) w[op.scope] = entry; else delete w[op.scope];
+      } else {
+        if (op.text.trim()) w.courses[op.scope] = entry; else delete w.courses[op.scope];
+      }
+      if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[op.weekKey];
+      break;
+    }
+    case "habit.upsert": {
+      const ex = findById(S.habits, op.habit.id);
+      if (ex) Object.assign(ex, op.habit, { updatedAt: nowIso() });
+      else S.habits.push({ ...op.habit });
+      break;
+    }
+    case "habit.patch": {
+      const h = findById(S.habits, op.id); if (!h) return false;
+      Object.assign(h, op.patch, { updatedAt: nowIso() });
+      break;
+    }
+    case "habit.deleteAll": {
+      const i = S.habits.findIndex(h => h.id === op.id); if (i < 0) return false;
+      S.habits.splice(i, 1); delete S.habitLog[op.id];
+      break;
+    }
+    case "habit.set": {
+      const log = (S.habitLog[op.habitId] ||= {});
+      const v = Math.floor(Number(op.value)) || 0;
+      if (v > 0) log[op.dateKey] = v; else delete log[op.dateKey];
+      break;
+    }
+    case "habit.delta": {
+      const log = (S.habitLog[op.habitId] ||= {});
+      const v = (Math.floor(Number(log[op.dateKey])) || 0) + (Math.floor(Number(op.delta)) || 0);
+      if (v > 0) log[op.dateKey] = v; else delete log[op.dateKey];
+      break;
+    }
+    case "settings.patch": Object.assign(S.settings, op.patch); break;
+    default: return false;
+  }
+  return true;
+}
+function dispatch(op, opts = {}) {
+  if (mode === "readonly" || mode === "load-error" || futureVersion) {
+    // Display-only materialization keeps recurring instances visible; nothing persists in these modes.
+    if (opts.materialize) { const ok = apply(op); if (ok !== false) rev++; return ok; }
+    toast(mode === "load-error" ? "Your data hasn’t loaded yet — editing is paused" : "View-only — changes can’t be saved here");
+    return false;
+  }
+  const applied = apply(op);
+  if (applied !== false) { opLog.push(op); rev++; markDirty(); }
+  if (!opts.silent) render();
+  return applied;
+}
+
+/* ---- derived queries ---- */
+function byOrder(a, b) { return (a.sortOrder - b.sortOrder) || String(a.createdAt).localeCompare(String(b.createdAt)); }
+function nextSortOrder(arr) { return arr.reduce((m, x) => Math.max(m, x.sortOrder || 0), 0) + 100; }
+function activeCourses() { return S.courses.filter(c => !c.archived).sort(byOrder); }
+function courseById(id) { return findById(S.courses, id); }
+function habitById(id) { return findById(S.habits, id); }
+
+function materializeWeek(weekKey) {
+  for (const r of S.recurringTemplates) {
+    if (r.archived) continue;
+    if (compareWeekKeys(r.fromWeek, weekKey) > 0) continue;
+    if (r.untilWeek && compareWeekKeys(weekKey, r.untilWeek) > 0) continue;
+    if (r.skipWeeks.includes(weekKey)) continue;
+    const id = "ti_" + r.id + "_" + weekKey;
+    if (findById(S.tasks, id)) continue;
+    dispatch({ t: "task.upsert", task: {
+      id, title: r.title, category: r.category, courseId: r.courseId, label: r.label,
+      weekKey, dueDate: null, isDeadline: false, status: "open", doneAt: null,
+      notes: r.notes, templateId: r.id, sortOrder: r.sortOrder,
+      createdAt: nowIso(), updatedAt: nowIso(),
+    }}, { silent: true, materialize: true });
+  }
+}
+function tasksForWeek(weekKey, category) {
+  return S.tasks.filter(t => t.weekKey === weekKey && (!category || t.category === category)).sort(byOrder);
+}
+function tasksOnDate(dateKey) { return S.tasks.filter(t => t.dueDate === dateKey).sort(byOrder); }
+function weekCounts(weekKey) {
+  const out = { total: { open: 0, done: 0 } };
+  for (const c of CATS) out[c] = { open: 0, done: 0 };
+  for (const t of S.tasks) {
+    if (t.weekKey !== weekKey) continue;
+    out[t.category][t.status]++; out.total[t.status]++;
+  }
+  return out;
+}
+function weekTrend(nWeeks, endKey) {
+  endKey = endKey || currentWeekKey();
+  const keys = [];
+  for (let i = nWeeks - 1; i >= 0; i--) keys.push(addWeeks(endKey, -i));
+  return keys.map(k => {
+    const row = { weekKey: k };
+    const hist = S.history[k];
+    const live = weekCounts(k);
+    for (const c of CATS) {
+      row[c] = {
+        open: live[c].open + (hist?.[c]?.open || 0),
+        done: live[c].done + (hist?.[c]?.done || 0),
+      };
+    }
+    return row;
+  });
+}
+function overdueTasks() {
+  const today = todayKey(), cw = currentWeekKey();
+  return S.tasks.filter(t => t.status === "open" &&
+    (t.dueDate ? t.dueDate < today : compareWeekKeys(t.weekKey, cw) < 0)
+  ).sort((a, b) => String(a.dueDate || a.weekKey).localeCompare(String(b.dueDate || b.weekKey)));
+}
+function upcomingDeadlines(limit) {
+  const today = todayKey(), horizon = addDaysKey(today, 14);
+  return S.tasks.filter(t => t.status === "open" && t.isDeadline && t.dueDate && t.dueDate >= today && t.dueDate <= horizon)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, limit || 5);
+}
+function calendarMonth(year, month0) {
+  const first = new Date(year, month0, 1);
+  const last = new Date(year, month0 + 1, 0);
+  const weeks = [];
+  let k = weekKeyOf(first);
+  const endK = weekKeyOf(last);
+  for (let guard = 0; guard < 7; guard++) {
+    const days = weekDates(k).map(d => {
+      const dateKey = dateKeyOf(d);
+      return { dateKey, day: d.getDate(), inMonth: d.getMonth() === month0, isToday: dateKey === todayKey(), items: tasksOnDate(dateKey) };
+    });
+    weeks.push({ weekKey: k, days });
+    if (k === endK) break;
+    k = addWeeks(k, 1);
+  }
+  return weeks;
+}
+/* habits */
+function habitChecked(h, dateKey) { return (S.habitLog[h.id]?.[dateKey] || 0) >= 1; }
+function habitActiveOn(h, d) { return h.activeDays.includes(isoDow(d) + 1); }
+function habitStreaks(h) {
+  const today = localMidnight(new Date());
+  let cursor = new Date(today);
+  const start = parseDateKey(h.startDate);
+  if (habitActiveOn(h, cursor) && !habitChecked(h, dateKeyOf(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let current = 0;
+  while (cursor >= start) {
+    if (habitActiveOn(h, cursor)) {
+      if (habitChecked(h, dateKeyOf(cursor))) current++;
+      else break;
+    }
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  let longest = 0, run = 0;
+  const fwd = new Date(start);
+  while (fwd <= today) {
+    if (habitActiveOn(h, fwd)) {
+      if (habitChecked(h, dateKeyOf(fwd))) { run++; if (run > longest) longest = run; }
+      else run = 0;
+    }
+    fwd.setDate(fwd.getDate() + 1);
+  }
+  return { current, longest };
+}
+function habitWeekProgress(h, weekKey) {
+  const ds = weekDates(weekKey);
+  if (h.kind === "weekly") {
+    let logged = 0;
+    for (const d of ds) logged += S.habitLog[h.id]?.[dateKeyOf(d)] || 0;
+    return { logged, target: h.weeklyTarget, pct: Math.min(1, logged / h.weeklyTarget) };
+  }
+  const today = localMidnight(new Date());
+  let logged = 0, target = 0;
+  for (const d of ds) {
+    if (!habitActiveOn(h, d) || dateKeyOf(d) < h.startDate) continue;
+    if (d <= today) { target++; if (habitChecked(h, dateKeyOf(d))) logged++; }
+  }
+  return { logged, target, pct: target ? logged / target : 0 };
+}
+function habit28dPct(h) {
+  const today = localMidnight(new Date());
+  let done = 0, total = 0;
+  const d = new Date(today); d.setDate(d.getDate() - 27);
+  while (d <= today) {
+    if (habitActiveOn(h, d) && dateKeyOf(d) >= h.startDate) { total++; if (habitChecked(h, dateKeyOf(d))) done++; }
+    d.setDate(d.getDate() + 1);
+  }
+  return total ? Math.round(100 * done / total) : null;
+}
+function habitCompletionSeries(h, nWeeks) {
+  const out = [];
+  for (let i = nWeeks - 1; i >= 0; i--) {
+    const k = addWeeks(currentWeekKey(), -i);
+    const p = habitWeekProgress(h, k);
+    out.push({ weekKey: k, pct: p.target ? Math.min(1, p.logged / p.target) : 0 });
+  }
+  return out;
+}
+
+/* ---- ui prefs (per-browser convenience only) ---- */
+function loadUiPrefs() {
+  try { return JSON.parse(localStorage.getItem("planner.uiprefs")) || {}; } catch { return {}; }
+}
+function saveUiPrefs() {
+  try { localStorage.setItem("planner.uiprefs", JSON.stringify({ plannerTab: UI.plannerTab, insightsOpen: UI.insightsOpen })); } catch {}
+}
+/* ============================================================
+   sync — modes, debounced single-flight save, stash, boot
+   ============================================================ */
+let mode = "booting";      // booting | synced | html-fallback | local-only | readonly
+let saveState = "idle";    // idle | dirty | saving | saved | backoff | error
+let dirty = false, inFlight = false;
+let saveTimer = null, firstDirtyAt = null, backoffMs = 0, nextSaveAllowedAt = 0, savedFlashTimer = null, autoRetryTimer = null;
+let artifactNS = null;
+let conflictLock = false;  // set once a conflict stash is done; page is about to reload
+
+function markDirty() {
+  if (mode === "readonly" || mode === "load-error" || conflictLock) return;
+  dirty = true;
+  if (!firstDirtyAt) firstDirtyAt = Date.now();
+  if (saveState !== "saving" && saveState !== "backoff") saveState = "dirty";
+  scheduleSave();
+  updateChrome();
+}
+function scheduleSave(ms) {
+  if (mode === "readonly" || mode === "load-error" || conflictLock) return;
+  clearTimeout(saveTimer);
+  const base = ms != null ? ms : Math.min(3000, Math.max(300, (firstDirtyAt || Date.now()) + 15000 - Date.now()));
+  const wait = Math.max(base, nextSaveAllowedAt - Date.now()); // honor rate-limit backoff
+  saveTimer = setTimeout(() => saveNow(), wait);
+}
+function serializeSnapshot() {
+  return JSON.stringify({ ...S, meta: { ...S.meta, seq: S.meta.seq + 1, lastSavedAt: nowIso(), lastSavedBy: deviceId } });
+}
+function localWrite(json) { localStorage.setItem("planner.data", json); }
+
+/* ---- GitHub sync backend (used when the page is not running as an artifact) ---- */
+const GH = { owner: "Weikai2001", repo: "weekwise-data", path: "planner.json", branch: "main" };
+let ghSha = null, ghAuthFailed = false, ghRefreshInFlight = false;
+function ghToken() { try { return localStorage.getItem("planner.ghtoken") || null; } catch { return null; } }
+function setGhToken(t) { try { t ? localStorage.setItem("planner.ghtoken", t) : localStorage.removeItem("planner.ghtoken"); } catch {} }
+const ghFileUrl = () => `https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`;
+const ghRepoUrl = () => `https://api.github.com/repos/${GH.owner}/${GH.repo}`;
+function ghHeaders(tok) {
+  const h = { Accept: "application/vnd.github+json" };
+  if (tok) h.Authorization = "Bearer " + tok;
+  return h;
+}
+function b64encodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decodeUtf8(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ""));
+  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+async function ghLoad(tok) {
+  const r = await fetch(ghFileUrl() + "?ref=" + GH.branch, { headers: ghHeaders(tok), cache: "no-store" });
+  if (r.status === 404) {
+    // 404 is ambiguous on private repos: no access looks like not-found. Disambiguate via repo metadata.
+    try {
+      const rr = await fetch(ghRepoUrl(), { headers: ghHeaders(tok), cache: "no-store" });
+      if (rr.ok) return { notFound: true };
+    } catch {}
+    return { authFail: true, status: 404 };
+  }
+  if (r.status === 401 || r.status === 403) return { authFail: true, status: r.status };
+  if (!r.ok) return { error: r.status };
+  const j = await r.json();
+  return { sha: j.sha, text: b64decodeUtf8(j.content) };
+}
+function ghMergeRemote(remoteHydrated) {
+  // Adopt the remote document, then re-apply this view's unsent ops on top;
+  // they stay in opLog so the next save pushes the merged result.
+  S = remoteHydrated.data; futureVersion = remoteHydrated.future;
+  for (const op of opLog) { try { apply(op); } catch {} }
+  normalize(S); rev++;
+  render();
+}
+async function ghPublish(snapshot) {
+  const tok = ghToken();
+  if (!tok) { const e = new Error("no sync code"); e.code = "not_writer"; throw e; }
+  if (ghSha === null) {
+    // Never saw the remote sha this session: pre-flight so we can never clobber blind.
+    const res = await ghLoad(tok);
+    if (res.text !== undefined) {
+      ghSha = res.sha;
+      const remote = tryHydrate(res.text);
+      if (remote && remote.seq > S.meta.seq) { ghMergeRemote(remote); const e = new Error("merged newer remote"); e.code = "gh_merged"; throw e; }
+    } else if (res.authFail) { const e = new Error("auth"); e.code = "not_writer"; throw e; }
+    else if (!res.notFound) { const e = new Error("net"); e.code = "upstream_error"; throw e; }
+  }
+  const body = { message: "planner update", content: b64encodeUtf8(snapshot), branch: GH.branch };
+  if (ghSha) body.sha = ghSha;
+  const r = await fetch(ghFileUrl(), { method: "PUT", headers: { ...ghHeaders(tok), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) { const e = new Error("conflict"); e.code = "gh_conflict"; throw e; }
+  if (r.status === 401 || r.status === 403) {
+    if (r.headers.get("x-ratelimit-remaining") === "0") { const e = new Error("rate limit"); e.code = "rate_limited"; throw e; }
+    const e = new Error("auth"); e.code = "not_writer"; throw e;
+  }
+  if (!r.ok) { const e = new Error("http " + r.status); e.code = "upstream_error"; throw e; }
+  const j = await r.json();
+  ghSha = j.content.sha;
+}
+async function ghResync() {
+  try {
+    const res = await ghLoad(ghToken());
+    if (res.text === undefined) throw new Error("resync load failed");
+    ghSha = res.sha;
+    const remote = tryHydrate(res.text);
+    if (remote) {
+      if (remote.future) { ghMergeRemote(remote); setMode("readonly"); return; }
+      ghMergeRemote(remote);
+    }
+    saveState = "dirty"; scheduleSave(500); updateChrome();
+  } catch {
+    saveState = "error";
+    clearTimeout(autoRetryTimer);
+    autoRetryTimer = setTimeout(() => saveNow(), 60000);
+    updateChrome();
+  }
+}
+async function ghRefreshIfIdle() {
+  // Pull another device's changes when this tab regains attention and has nothing unsaved.
+  if (mode !== "github" || dirty || inFlight || ghRefreshInFlight || conflictLock) return;
+  ghRefreshInFlight = true;
+  try {
+    const res = await ghLoad(ghToken());
+    if (res.text !== undefined && res.sha !== ghSha) {
+      const remote = tryHydrate(res.text);
+      if (remote && remote.seq >= S.meta.seq) {
+        ghSha = res.sha;
+        S = remote.data; futureVersion = remote.future;
+        normalize(S); rev++;
+        if (futureVersion) setMode("readonly"); else { render(); updateChrome(); }
+        try { localWrite(res.text); } catch {}
+      }
+    }
+  } catch {} finally { ghRefreshInFlight = false; }
+}
+window.addEventListener("focus", () => ghRefreshIfIdle());
+
+async function saveNow(opts = {}) {
+  if (mode === "readonly" || mode === "load-error" || conflictLock || !dirty) return;
+  if (mode === "booting") { scheduleSave(800); return; }
+  if (Date.now() < nextSaveAllowedAt) { saveState = "backoff"; scheduleSave(); updateChrome(); return; }
+  if (inFlight) { return; } // opLog keeps growing; finally-block reschedules
+  inFlight = true; saveState = "saving"; updateChrome();
+  const opCountAtSnapshot = opLog.length;
+  const snapshot = serializeSnapshot();
+  try {
+    if (mode === "synced") {
+      await artifactNS.publish({ "data/planner.json": snapshot });
+    } else if (mode === "github") {
+      await ghPublish(snapshot);
+    } else if (mode === "html-fallback") {
+      stashNow(); // an html publish reloads this view on success
+      await artifactNS.publish(await renderDocument(snapshot));
+      return; // view reloads; nothing more to do
+    } else { // local-only
+      localWrite(snapshot);
+    }
+    // committed
+    S.meta.seq = S.meta.seq + 1; S.meta.lastSavedAt = nowIso(); S.meta.lastSavedBy = deviceId;
+    opLog = opLog.slice(opCountAtSnapshot);
+    try { sessionStorage.removeItem("planner.stash"); } catch {}
+    if (mode === "synced" || mode === "github") { try { localWrite(snapshot); } catch {} }
+    backoffMs = 0; nextSaveAllowedAt = 0; firstDirtyAt = null;
+    if (opLog.length) { dirty = true; saveState = "dirty"; firstDirtyAt = Date.now(); scheduleSave(); }
+    else {
+      dirty = false; saveState = "saved"; clearTimeout(savedFlashTimer);
+      savedFlashTimer = setTimeout(() => { if (saveState === "saved") { saveState = "idle"; updateChrome(); } }, 2000);
+    }
+  } catch (e) {
+    handleSaveError(e, opts);
+  } finally {
+    inFlight = false;
+    updateChrome();
+  }
+}
+function handleSaveError(e, opts) {
+  const code = (e && e.code) || (mode === "local-only" ? "local_write_failed" : "upstream_error");
+  saveState = "dirty";
+  switch (code) {
+    case "conflict": {
+      // Routine: another device published first; the shell reloads every view.
+      conflictLock = true;
+      stashNow();
+      showConflictOverlay();
+      return;
+    }
+    case "rate_limited": {
+      backoffMs = backoffMs ? Math.min(backoffMs * 2, 120000) : 30000;
+      nextSaveAllowedAt = Date.now() + backoffMs;
+      saveState = "backoff"; scheduleSave(backoffMs);
+      return;
+    }
+    case "gh_conflict": {
+      // Another device pushed first. No page reload here: refetch, merge our
+      // unsent ops on top, and save again shortly.
+      ghResync();
+      return;
+    }
+    case "gh_merged": {
+      // Pre-flight adopted a newer remote and replayed our ops; just save again.
+      saveState = "dirty"; scheduleSave(500);
+      return;
+    }
+    case "not_writer": case "not_granted": case "consent_required": {
+      if (mode === "github") { ghAuthFailed = true; setMode("local-only"); scheduleSave(200); return; }
+      setMode("readonly");
+      return;
+    }
+    case "capability_disabled": case "capability_removed": case "read_only_path": {
+      if (mode === "synced") { setMode("html-fallback"); scheduleSave(200); }
+      else if (mode === "html-fallback") { setMode("local-only"); scheduleSave(200); }
+      return;
+    }
+    case "too_large": {
+      saveState = "error";
+      toast("Too much data to save. Export a backup and clear old weeks.", { label: "Export", fn: () => openSheet("export") });
+      return;
+    }
+    case "invalid_content": case "transform_error": {
+      saveState = "error";
+      console.error("planner: publish rejected as invalid_content", e);
+      return;
+    }
+    case "local_write_failed": {
+      saveState = "error";
+      return;
+    }
+    default: { // upstream_error and unknown codes
+      if (!opts.isRetry) { setTimeout(() => saveNow({ isRetry: true }), 1000 + Math.random() * 2000); }
+      else {
+        saveState = "error";
+        clearTimeout(autoRetryTimer);
+        autoRetryTimer = setTimeout(() => saveNow(), 60000);
+      }
+      return;
+    }
+  }
+}
+function setMode(m) {
+  mode = m;
+  if (m === "readonly") { dirty = false; clearTimeout(saveTimer); }
+  updateChrome();
+  render();
+}
+
+/* html-fallback: regenerate the full document from fetched pristine source */
+let pageSourcePromise = null;
+function getPageSource() {
+  pageSourcePromise ||= fetch(location.href.split("#")[0], { cache: "no-cache" }).then(r => {
+    if (!r.ok) throw new Error("source fetch failed");
+    return r.text();
+  }).catch(e => { pageSourcePromise = null; throw e; });
+  return pageSourcePromise;
+}
+async function renderDocument(json) {
+  let src;
+  try { src = await getPageSource(); }
+  catch { const err = new Error("no source"); err.code = "capability_disabled"; throw err; }
+  // Encoding every left angle bracket as a JSON unicode escape round-trips
+  // through JSON.parse while neutralizing script close tags, script open
+  // tags, and HTML comment openers inside the script element.
+  const safe = json.replace(/</g, "\\u003c");
+  // built via concatenation so this source never contains a raw script-open sequence
+  const re = new RegExp('(<scr' + 'ipt id="seed-data"[^>]*>)[\\s\\S]*?(<\\/scr' + 'ipt>)');
+  if (!re.test(src)) { const err = new Error("no seed block"); err.code = "capability_disabled"; throw err; }
+  src = src.replace(re, (m, a, b) => a + safe + b);
+  if (!/^\s*<!doctype/i.test(src)) {
+    src = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>' + src + "</body></html>";
+  }
+  return src;
+}
+
+/* ---- stash & restore (survives conflict reloads / page close) ---- */
+function collectDrafts() {
+  const out = {};
+  const el = document.activeElement;
+  if (el && el.dataset && el.dataset.draftId && ("value" in el)) out[el.dataset.draftId] = el.value;
+  return out;
+}
+function stashNow() {
+  try {
+    if (UI.sheet) syncDraftInputs();
+    sessionStorage.setItem("planner.stash", JSON.stringify({
+      basedOnSeq: S.meta.seq, stashedAt: nowIso(), ops: opLog,
+      booting: mode === "booting",
+      sheet: UI.sheet ? { kind: UI.sheet.kind, params: UI.sheet.params } : null,
+      drafts: collectDrafts(),
+      view: { view: UI.view, plannerTab: UI.plannerTab, weekKey: UI.weekKey, scrollY: window.scrollY },
+    }));
+  } catch {}
+}
+function restoreStash() {
+  let stash = null;
+  try { stash = JSON.parse(sessionStorage.getItem("planner.stash")); } catch {}
+  if (!stash || typeof stash !== "object") return;
+  try { sessionStorage.removeItem("planner.stash"); } catch {}
+  if (typeof stash.stashedAt !== "string" || !(Date.now() - Date.parse(stash.stashedAt) <= 86400000)) return;
+  // Our own flush won before the page died: ops are already persisted. (Stashes taken
+  // while still booting used the seed's seq and are exempt from this discard rule.)
+  if (!stash.booting && S.meta.seq > stash.basedOnSeq && S.meta.lastSavedBy === deviceId) return;
+  const canWrite = mode !== "readonly" && mode !== "load-error" && !futureVersion;
+  if (Array.isArray(stash.ops) && stash.ops.length && canWrite) {
+    for (const op of stash.ops) { try { if (op && typeof op.t === "string") dispatch(op, { silent: true }); } catch {} }
+    normalize(S); rev++;
+  }
+  if (stash.view && typeof stash.view === "object") {
+    if (["home", "planner", "calendar", "habits"].includes(stash.view.view)) UI.view = stash.view.view;
+    if (CATS.includes(stash.view.plannerTab)) UI.plannerTab = stash.view.plannerTab;
+    if (typeof stash.view.weekKey === "string" && parseWeekKey(stash.view.weekKey)) UI.weekKey = stash.view.weekKey;
+  }
+  UI.pendingDrafts = (stash.drafts && typeof stash.drafts === "object" && !Array.isArray(stash.drafts)) ? stash.drafts : null;
+  if (stash.sheet && typeof stash.sheet === "object" &&
+      Object.prototype.hasOwnProperty.call(SHEETS, stash.sheet.kind) &&
+      stash.sheet.params && typeof stash.sheet.params === "object") {
+    UI.pendingSheet = { kind: stash.sheet.kind, params: stash.sheet.params };
+  }
+  if (stash.view && typeof stash.view.scrollY === "number") requestAnimationFrame(() => window.scrollTo(0, stash.view.scrollY));
+}
+function showConflictOverlay() {
+  const o = document.createElement("div");
+  o.style.cssText = "position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--text-2);";
+  o.textContent = "Syncing latest changes…";
+  document.body.appendChild(o);
+}
+
+/* ---- chrome: save chip + banners ---- */
+function updateChrome() {
+  const chip = document.getElementById("save-chip");
+  const banner = document.getElementById("banner-slot");
+  if (!chip) return;
+  let cls = "", text = "", title = "";
+  if (mode === "readonly") { cls = "st-readonly"; text = "View-only"; }
+  else if (mode === "load-error") { cls = "st-error"; text = "Data not loaded"; }
+  else if (mode === "local-only") {
+    if (saveState === "error") { cls = "st-error"; text = "Couldn't save here"; }
+    else { cls = "st-local"; text = "Local only"; }
+  } else if (saveState === "error") { cls = "st-error"; text = "Couldn't save — retry"; title = "Tap to retry"; }
+  else if (saveState === "backoff") { cls = "st-saving"; text = "Will save shortly"; }
+  else if (saveState === "saving") { cls = "st-saving"; text = "Saving…"; }
+  else if (saveState === "dirty") { cls = "st-dirty"; text = "Unsaved"; }
+  else { cls = "st-saved"; text = "Saved"; }
+  chip.className = cls; chip.title = title;
+  chip.querySelector(".chip-text").textContent = text;
+  let b = "";
+  if (futureVersion) b = '<div class="banner banner-warn">This page is an older version of the app than your data. Open the latest version to edit — showing read-only.</div>';
+  else if (mode === "load-error") b = '<div class="banner banner-warn">Couldn’t load your data — retrying. Editing is paused so nothing gets overwritten.<span class="spacer"></span><button data-action="reload-app">Reload</button></div>';
+  else if (mode === "readonly") b = '<div class="banner banner-info">View-only — you don’t have edit access on this device.</div>';
+  else if (mode === "local-only" && UI.bootDone) {
+    b = ghAuthFailed
+      ? '<div class="banner banner-warn">Sync code invalid or expired — changes stay in this browser until it’s updated.<span class="spacer"></span><button data-action="open-sync">Update code</button></div>'
+      : '<div class="banner banner-info">Local only — changes stay in this browser.<span class="spacer"></span><button data-action="open-sync">Connect sync</button></div>';
+  }
+  banner.innerHTML = b;
+}
+
+/* ---- boot ---- */
+function tryHydrate(raw) {
+  try {
+    futureVersion = false;
+    const d = migrate(typeof raw === "string" ? JSON.parse(raw) : raw);
+    return { data: d, future: futureVersion, seq: d.meta.seq };
+  } catch { return null; }
+}
+async function boot() {
+  const prefs = loadUiPrefs();
+  UI.plannerTab = CATS.includes(prefs.plannerTab) ? prefs.plannerTab : "study";
+  UI.insightsOpen = (prefs.insightsOpen && typeof prefs.insightsOpen === "object" && !Array.isArray(prefs.insightsOpen)) ? prefs.insightsOpen : {};
+  parseHash();
+  // 1. seed (may carry real data after an html-fallback publish)
+  const seedEl = document.getElementById("seed-data");
+  let best = tryHydrate(seedEl ? seedEl.textContent : null) || { data: emptyState(), future: false, seq: 0 };
+  futureVersion = best.future; S = best.data;
+  renderShell(); render(); updateChrome();
+  // 2. data file (the canonical store once the first save has happened).
+  //    Only a real 404 means "no data yet" — anything else must not be
+  //    mistaken for a first run, or the next save would overwrite real data.
+  let fetched = null, fetchFailed = false;
+  try {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 5000);
+    const r = await fetch("data/planner.json", { signal: ctl.signal, cache: "no-cache" });
+    clearTimeout(to);
+    if (r.ok) { fetched = tryHydrate(await r.text()); if (!fetched) fetchFailed = true; }
+    else if (r.status !== 404) fetchFailed = true;
+  } catch { fetchFailed = true; }
+  // 3. local cold cache
+  let cached = null;
+  try { cached = tryHydrate(localStorage.getItem("planner.data")); } catch {}
+  const preS = S;
+  for (const cand of [fetched, cached]) {
+    if (cand && cand.seq >= best.seq) best = cand;
+  }
+  if (best.data !== preS) {
+    S = best.data; futureVersion = best.future;
+    // Re-apply edits made while the seed was still showing; they stay in opLog
+    // so the next save persists them onto the hydrated state.
+    if (opLog.length) { for (const op of opLog) { try { apply(op); } catch {} } normalize(S); rev++; }
+  }
+  // 4. capability
+  let ns = null;
+  try { if (window.claude && typeof window.claude.use === "function") ns = await window.claude.use("artifact"); } catch {}
+  if (futureVersion) { artifactNS = ns; mode = "readonly"; }
+  else if (ns && fetchFailed && best.seq === 0) { artifactNS = ns; mode = "load-error"; retryDataLoad(); }
+  else if (ns) { artifactNS = ns; mode = "synced"; }
+  else if (ghToken()) {
+    let res;
+    try { res = await ghLoad(ghToken()); } catch { res = { error: 0 }; }
+    if (res.text !== undefined) {
+      const cand = tryHydrate(res.text);
+      if (cand) {
+        ghSha = res.sha;
+        if (cand.seq >= S.meta.seq) {
+          const hadOps = opLog.length;
+          S = cand.data; futureVersion = cand.future;
+          if (hadOps) { for (const op of opLog) { try { apply(op); } catch {} } normalize(S); rev++; }
+          try { localWrite(res.text); } catch {}
+          mode = futureVersion ? "readonly" : "github";
+        } else {
+          mode = "github"; // local cache is ahead: push it forward (compare-and-swap protects the remote)
+          dirty = true; firstDirtyAt = firstDirtyAt || Date.now(); saveState = "dirty";
+        }
+      } else { mode = "load-error"; retryDataLoad(); }
+    } else if (res.notFound) { ghSha = null; mode = "github"; }
+    else if (res.authFail) { ghAuthFailed = true; mode = "local-only"; }
+    else if (S.meta.seq > 0) { mode = "github"; } // offline with a local cache; save pre-flights for the sha
+    else { mode = "load-error"; retryDataLoad(); }
+  }
+  else { mode = "local-only"; }
+  UI.bootDone = true;
+  // 5. stash replay (after hydrate + mode known)
+  restoreStash();
+  if (dirty) scheduleSave();
+  updateChrome(); render();
+  if (UI.pendingSheet) { const ps = UI.pendingSheet; UI.pendingSheet = null; openSheet(ps.kind, ps.params); }
+}
+async function retryDataLoad() {
+  for (let i = 0; i < 3 && mode === "load-error"; i++) {
+    await new Promise(res => setTimeout(res, 8000));
+    if (mode !== "load-error") return;
+    if (artifactNS) {
+      try {
+        const r = await fetch("data/planner.json", { cache: "no-cache" });
+        if (r.ok) {
+          const cand = tryHydrate(await r.text());
+          if (cand) {
+            S = cand.data; futureVersion = cand.future;
+            mode = futureVersion ? "readonly" : "synced";
+            updateChrome(); render();
+            return;
+          }
+        } else if (r.status === 404) { mode = "synced"; updateChrome(); render(); return; } // genuinely first run
+      } catch {}
+    } else if (ghToken()) {
+      try {
+        const res = await ghLoad(ghToken());
+        if (res.text !== undefined) {
+          const cand = tryHydrate(res.text);
+          if (cand) {
+            ghSha = res.sha; S = cand.data; futureVersion = cand.future;
+            mode = futureVersion ? "readonly" : "github";
+            updateChrome(); render();
+            return;
+          }
+        } else if (res.notFound) { ghSha = null; mode = "github"; updateChrome(); render(); return; }
+        else if (res.authFail) { ghAuthFailed = true; mode = "local-only"; updateChrome(); render(); return; }
+      } catch {}
+    }
+  }
+}
+window.addEventListener("pagehide", () => { flushSummary(); if (dirty && !conflictLock) { stashNow(); saveNow(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { flushSummary(); if (dirty && !conflictLock) { stashNow(); saveNow(); } }
+  else if (document.visibilityState === "visible") ghRefreshIfIdle();
+});
+/* ============================================================
+   components — helpers, icons, rows, charts, sheet, toast, shell
+   ============================================================ */
+const UI = {
+  view: "home", plannerTab: "study", weekKey: currentWeekKey(),
+  calYear: new Date().getFullYear(), calMonth0: new Date().getMonth(),
+  selectedDay: null, sheet: null, insightsOpen: {}, homeAnytimeOpen: false,
+  overdueOpen: false, expandedHabit: null, editingSummary: null,
+  bootDone: false, pendingDrafts: null, archivedHabitsOpen: false,
+};
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function catColor(cat) { return `var(--cat-${cat})`; }
+function catSoft(cat) { return `var(--cat-${cat}-soft)`; }
+function swColor(i) { return `var(--sw-${((i % 12) + 12) % 12})`; }
+function taskColor(t) {
+  if (t.category === "study" && t.courseId) { const c = courseById(t.courseId); if (c) return swColor(c.colorIndex); }
+  return catColor(t.category);
+}
+function taskContextLabel(t) {
+  if (t.category === "study" && t.courseId) { const c = courseById(t.courseId); if (c) return c.name; }
+  return t.label || CAT_LABEL[t.category];
+}
+
+/* icons */
+const IC = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>',
+  planner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="m8.2 12.2 2.3 2.3 5.2-5.2"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 2.8V6.5M16 2.8V6.5"/></svg>',
+  habits: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5 21 6.5l-4 4"/><path d="M3 11V9.5A3 3 0 0 1 6 6.5h15"/><path d="M7 21.5 3 17.5l4-4"/><path d="M21 13v1.5a3 3 0 0 1-3 3H3"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>',
+  left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>',
+  right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4m0 13.6v2.4M4.6 6.2l1.7 1.7m11.4 8.2 1.7 1.7m-16.6-5.8h2.4m13.6 0h2.4M4.6 17.8l1.7-1.7M17.7 7.9l1.7-1.7"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  flame: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12 22c-4 0-7-2.8-7-6.6 0-2.9 1.9-4.9 3.4-6.7C9.7 7.2 11 5.7 11 3.5c0-.6.6-1 1.1-.7 2.8 1.6 6.9 5.5 6.9 12.6 0 3.8-3 6.6-7 6.6Zm0-2c1.7 0 3-1.2 3-2.9 0-1.9-1.4-3-3-4.6-1.6 1.6-3 2.7-3 4.6 0 1.7 1.3 2.9 3 2.9Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 7 10 17 5 12"/></svg>',
+};
+
+/* task row */
+function checkBtn(t) {
+  const color = taskColor(t);
+  const on = t.status === "done";
+  return `<button class="check" data-action="toggle-task" data-id="${esc(t.id)}" aria-pressed="${on}" aria-label="${on ? "Reopen" : "Complete"}: ${esc(t.title)}" style="${on ? `background:${color};border-color:${color}` : ""}">${IC.check}</button>`;
+}
+function taskRowHTML(t, opts = {}) {
+  const done = t.status === "done";
+  const meta = [];
+  if (!opts.hideContext) meta.push(`<span class="cat-dot" style="background:${taskColor(t)}"></span><span>${esc(taskContextLabel(t))}</span>`);
+  let chip = "";
+  if (t.dueDate && !opts.hideDate) {
+    const overdue = !done && t.dueDate < todayKey();
+    chip = `<span class="date-chip${overdue ? " overdue" : ""}">${esc(opts.longDate ? fmtDateShort(t.dueDate) : fmtDayNum(t.dueDate))}${overdue ? " · late" : ""}</span>`;
+  }
+  return `<div class="row${done ? " done" : ""}">
+    ${checkBtn(t)}
+    <button class="row-main" data-action="edit-task" data-id="${esc(t.id)}">
+      <div class="row-title">${t.isDeadline ? '<span class="deadline-mark" aria-label="deadline">◆</span> ' : ""}${esc(t.title) || "<span style='color:var(--text-3)'>Untitled</span>"}</div>
+      ${meta.length ? `<div class="row-meta">${meta.join("")}</div>` : ""}
+    </button>
+    ${chip}
+  </div>`;
+}
+
+/* ---- charts (inline SVG, theme tokens) ---- */
+function ringSVG(done, total, color, size) {
+  const pct = total > 0 ? Math.round(100 * done / total) : 0;
+  const center = total > 0 ? `${done}/${total}` : "–";
+  return `<svg width="${size}" height="${size}" viewBox="0 0 36 36" role="img" aria-label="${done} of ${total} done">
+    <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--surface-3)" stroke-width="3.6"/>
+    <circle cx="18" cy="18" r="15.9" fill="none" stroke="${color}" stroke-width="3.6" stroke-linecap="round"
+      stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/>
+    <text x="18" y="19.5" text-anchor="middle" class="svg-num" style="font-size:${total > 9 ? 8 : 9}px">${center}</text>
+  </svg>`;
+}
+function niceMax(v) {
+  if (v <= 4) return Math.max(2, v);
+  for (const s of [5, 10, 15, 20, 30, 50, 100, 200, 500, 1000]) if (v <= s) return s;
+  return Math.ceil(v / 1000) * 1000;
+}
+/* rows: [{weekKey, segs: [{val, fill, name}]}] bottom-up stacking */
+function stackedBarsSVG(rows, opts = {}) {
+  const W = 320, H = 142, top = 16, bottom = 20, left = 6, right = 6;
+  const plotH = H - top - bottom;
+  const n = rows.length;
+  const pitch = (W - left - right) / n, barW = Math.min(24, pitch - 12);
+  const totals = rows.map(r => r.segs.reduce((s, x) => s + x.val, 0));
+  const maxV = Math.max(...totals, 0);
+  const empty = maxV === 0;
+  const yMax = niceMax(maxV);
+  const scale = plotH / yMax;
+  let bars = "";
+  const cw = currentWeekKey();
+  rows.forEach((r, i) => {
+    const cx = left + pitch * i + pitch / 2;
+    const x = cx - barW / 2;
+    let y = H - bottom;
+    let segRects = "";
+    const drawn = r.segs.filter(s => s.val > 0);
+    drawn.forEach((s, si) => {
+      let h = Math.max(s.val * scale - 2, 2);
+      y -= h;
+      const isTop = si === drawn.length - 1;
+      const strokeAttr = s.stroke ? ` stroke="${s.stroke}" stroke-width="1"` : "";
+      if (isTop && h >= 4) {
+        const rr = 3;
+        segRects += `<path d="M${x} ${y + h} V${y + rr} Q${x} ${y} ${x + rr} ${y} H${x + barW - rr} Q${x + barW} ${y} ${x + barW} ${y + rr} V${y + h} Z" fill="${s.fill}"${strokeAttr}/>`;
+      } else {
+        segRects += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${s.fill}"${strokeAttr}/>`;
+      }
+      y -= 2;
+    });
+    if (empty) {
+      const gh = [42, 68, 50, 78, 36, 58, 72, 46][i % 8];
+      segRects = `<rect x="${x}" y="${H - bottom - gh}" width="${barW}" height="${gh}" rx="3" fill="var(--surface-3)" opacity=".5"/>`;
+    }
+    const wk = parseWeekKey(r.weekKey).week;
+    const tip = r.segs.map(s => `${s.val} ${s.name}`).join(", ");
+    bars += `<g data-week="${esc(r.weekKey)}" data-tip="Week ${wk} — ${esc(tip)}" style="cursor:${empty ? "default" : "pointer"}">
+      <title>Week ${wk} — ${esc(tip)}</title>
+      <rect x="${left + pitch * i}" y="0" width="${pitch}" height="${H}" fill="transparent"/>
+      ${segRects}
+      <text x="${cx}" y="${H - 6}" text-anchor="middle" class="svg-lbl${r.weekKey === cw ? " now" : ""}">W${wk}</text>
+    </g>`;
+  });
+  const grid = empty ? "" : `<line x1="${left}" y1="${H - bottom - yMax * scale}" x2="${W - right}" y2="${H - bottom - yMax * scale}" stroke="var(--border)" stroke-dasharray="3 3"/>
+    <text x="${left + 1}" y="${H - bottom - yMax * scale - 4}" class="svg-lbl">${yMax}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.ariaLabel || "Tasks per week")}">
+    <line x1="${left}" y1="${H - bottom}" x2="${W - right}" y2="${H - bottom}" stroke="var(--border)"/>
+    ${grid}${bars}
+  </svg>`;
+}
+function legendHTML(items) {
+  return `<div class="legend">${items.map(i => `<span><i style="background:${i.fill}${i.stroke ? `;border:1px solid ${i.stroke}` : ""}"></i>${esc(i.name)}</span>`).join("")}</div>`;
+}
+function sparklineSVG(points) {
+  const W = 84, H = 26, pad = 2;
+  if (!points.length) return "";
+  const step = (W - pad * 2) / Math.max(1, points.length - 1);
+  const xy = points.map((p, i) => [pad + i * step, H - pad - p.pct * (H - pad * 2)]);
+  const line = xy.map(p => p.map(v => v.toFixed(1)).join(",")).join(" ");
+  const area = `${pad},${H - pad} ${line} ${(pad + (points.length - 1) * step).toFixed(1)},${H - pad}`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="completion trend">
+    <polygon points="${area}" fill="var(--success-soft)"/>
+    <polyline points="${line}" fill="none" stroke="var(--success)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${xy[xy.length - 1][0]}" cy="${xy[xy.length - 1][1]}" r="2" fill="var(--success)"/>
+  </svg>`;
+}
+
+/* ---- sheet & toast infra ---- */
+function focusSelectorFor(el) {
+  if (!el || el === document.body || !el.dataset || !el.dataset.action) return null;
+  let sel = `[data-action="${CSS.escape(el.dataset.action)}"]`;
+  for (const [k, v] of Object.entries(el.dataset)) {
+    if (k === "action") continue;
+    sel += `[data-${k.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}="${CSS.escape(v)}"]`;
+  }
+  return sel;
+}
+function openSheet(kind, params = {}) {
+  UI.sheetOpener = focusSelectorFor(document.activeElement);
+  UI.sheetJustOpened = true;
+  UI.sheet = { kind, params };
+  renderSheet();
+}
+function closeSheet() {
+  if (!UI.sheet) return;
+  UI.sheet = null; renderSheet(); render();
+  if (UI.sheetOpener) {
+    const el = document.querySelector(UI.sheetOpener);
+    if (el) el.focus({ preventScroll: true });
+    UI.sheetOpener = null;
+  }
+}
+function renderSheet() {
+  const root = document.getElementById("sheet-root");
+  if (!UI.sheet) { root.classList.remove("open"); root.innerHTML = ""; return; }
+  const hadFocus = root.contains(document.activeElement);
+  const focusSel = hadFocus ? focusSelectorFor(document.activeElement) : null;
+  const body = SHEETS[UI.sheet.kind] ? SHEETS[UI.sheet.kind](UI.sheet.params) : "";
+  root.classList.add("open");
+  root.innerHTML = `<div class="backdrop" data-action="sheet-close"></div>
+    <div class="sheet" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-grip"></div>${body}</div>`;
+  const sheetEl = root.querySelector(".sheet");
+  const h2 = sheetEl.querySelector("h2");
+  if (h2) { h2.id = "sheet-title"; sheetEl.setAttribute("aria-labelledby", "sheet-title"); }
+  if (UI.sheetJustOpened) {
+    UI.sheetJustOpened = false;
+    const focusEl = root.querySelector("[data-autofocus]");
+    if (focusEl && window.matchMedia("(min-width: 900px)").matches) focusEl.focus();
+    else sheetEl.focus({ preventScroll: true });
+  } else if (focusSel && root.querySelector(focusSel)) {
+    root.querySelector(focusSel).focus({ preventScroll: true });
+  } else if (hadFocus) {
+    sheetEl.focus({ preventScroll: true });
+  }
+}
+let toastTimer = null, toastAction = null;
+function toast(text, action) {
+  const root = document.getElementById("toast-root");
+  toastAction = action ? action.fn : null;
+  root.innerHTML = `<div class="toast"><span>${esc(text)}</span>${action ? `<button data-action="toast-action">${esc(action.label)}</button>` : ""}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { root.innerHTML = ""; toastAction = null; }, 4500);
+}
+
+/* ---- shell (sidebar + tab bar) ---- */
+const NAV = [
+  { view: "home", label: "Home", icon: "home" },
+  { view: "planner", label: "Planner", icon: "planner" },
+  { view: "calendar", label: "Calendar", icon: "calendar" },
+  { view: "habits", label: "Habits", icon: "habits" },
+];
+function renderShell() {
+  document.getElementById("tabbar").innerHTML = NAV.map(n =>
+    `<button data-action="nav" data-view="${n.view}" aria-current="${UI.view === n.view}" aria-label="${n.label}">${IC[n.icon]}<span>${n.label}</span></button>`).join("");
+  document.getElementById("sidebar").innerHTML = `
+    <div class="wordmark">WeekWise</div>
+    <button class="nav-item" data-action="nav" data-view="home" aria-current="${UI.view === "home"}">${IC.home}Home</button>
+    <div class="nav-section">Planner</div>
+    ${CATS.map(c => `<button class="nav-item" data-action="nav" data-view="planner" data-tab="${c}" aria-current="${UI.view === "planner" && UI.plannerTab === c}"><span class="nav-dot" style="background:${catColor(c)}"></span>${CAT_LABEL[c]}</button>`).join("")}
+    <div class="nav-section">Overview</div>
+    <button class="nav-item" data-action="nav" data-view="calendar" aria-current="${UI.view === "calendar"}">${IC.calendar}Calendar</button>
+    <button class="nav-item" data-action="nav" data-view="habits" aria-current="${UI.view === "habits"}">${IC.habits}Habits</button>`;
+}
+/* ============================================================
+   views
+   ============================================================ */
+const QA_HINTS = {
+  study: "Add a task… e.g. Finish statistics homework",
+  work: "Add a task… e.g. Send weekly report",
+  personal: "Add a task… e.g. Book dentist appointment",
+};
+function weekbarHTML(scope) {
+  const wk = parseWeekKey(UI.weekKey);
+  const isNow = UI.weekKey === currentWeekKey();
+  const yr = wk.year !== isoWeekOf(new Date()).year ? " · " + wk.year : "";
+  return `<div class="weekbar">
+    <button class="icon-btn" data-action="week-nav" data-dir="-1" aria-label="Previous week">${IC.left}</button>
+    <button class="weekbar-label${isNow ? "" : " elsewhere"}" data-action="week-jump" aria-label="Jump to another week">
+      <span>Week ${wk.week}</span><span class="sub">${weekRangeLabel(UI.weekKey)}${yr}</span>
+    </button>
+    ${isNow ? "" : `<button class="today-btn" data-action="week-today">Today</button>`}
+    <button class="icon-btn" data-action="week-nav" data-dir="1" aria-label="Next week">${IC.right}</button>
+  </div>`;
+}
+function quickAddHTML(cat, weekKey) {
+  return `<form class="quick-add" data-form="quick-add" data-cat="${esc(cat)}" data-week="${esc(weekKey)}">
+    <input type="text" placeholder="${esc(QA_HINTS[cat] || "Add a task…")}" aria-label="Quick add task" data-draft-id="qa:${esc(cat)}" enterkeyhint="done">
+    <button type="button" class="icon-btn" data-action="open-task-sheet" data-cat="${esc(cat)}" data-week="${esc(weekKey)}" aria-label="Add with details">${IC.plus}</button>
+  </form>`;
+}
+function sortedRows(tasks, opts) {
+  const open = tasks.filter(t => t.status === "open");
+  const done = tasks.filter(t => t.status === "done");
+  return [...open, ...done].map(t => taskRowHTML(t, opts)).join("");
+}
+function overdueBannerHTML(list, scope) {
+  if (!list.length) return "";
+  const shown = UI.overdueOpen ? `<div class="card" style="margin-top:8px"><div class="rows">${list.map(t => taskRowHTML(t, { longDate: true })).join("")}</div></div>` : "";
+  return `<div class="banner banner-warn" role="status">
+      <span>${list.length} overdue</span><span class="spacer"></span>
+      <button data-action="toggle-overdue">${UI.overdueOpen ? "Hide" : "Show"}</button>
+      <button data-action="overdue-move" data-scope="${scope}">Move to this week</button>
+    </div>${shown}`;
+}
+function insightsHTML(cat) {
+  const open = !!UI.insightsOpen[cat];
+  const counts = weekCounts(UI.weekKey)[cat];
+  const trend = weekTrend(8).map(r => ({
+    weekKey: r.weekKey,
+    segs: [
+      { val: r[cat].done, fill: catColor(cat), name: "done" },
+      { val: r[cat].open, fill: catSoft(cat), stroke: catColor(cat), name: "open" },
+    ],
+  }));
+  return `<div class="card" style="margin-top:14px">
+    <button class="insights-toggle${open ? " open" : ""}" data-action="insights-toggle" data-cat="${cat}" aria-expanded="${open}">${IC.chev}<span>Insights</span></button>
+    ${open ? `<div class="insights-body">
+      <div style="text-align:center">${ringSVG(counts.done, counts.done + counts.open, catColor(cat), 88)}
+        <div style="font-size:12px;color:var(--text-2);margin-top:4px">done this week</div></div>
+      <div class="chart-wrap" style="flex:1;min-width:220px">${stackedBarsSVG(trend, { ariaLabel: CAT_LABEL[cat] + " tasks per week" })}
+        ${legendHTML([{ fill: catColor(cat), name: "Done" }, { fill: catSoft(cat), stroke: catColor(cat), name: "Still open" }])}
+        <div class="chart-caption"></div></div>
+    </div>` : ""}
+  </div>`;
+}
+function peekNextHTML(cat) {
+  for (let i = 1; i <= 8; i++) {
+    const k = addWeeks(UI.weekKey, i);
+    const t = tasksForWeek(k, cat).find(x => x.status === "open");
+    if (t) return `<div class="empty" style="padding-top:8px">Nothing planned for week ${parseWeekKey(UI.weekKey).week} yet.<br>Next up: “${esc(t.title)}” in week ${parseWeekKey(k).week}.</div>`;
+  }
+  return `<div class="empty" style="padding-top:8px">Nothing planned for week ${parseWeekKey(UI.weekKey).week} yet.</div>`;
+}
+
+function viewHome() {
+  const cw = currentWeekKey(), today = todayKey();
+  const now = new Date();
+  const counts = weekCounts(cw);
+  const overdue = overdueTasks();
+  const todays = S.tasks.filter(t => t.dueDate === today).sort(byOrder);
+  const anytime = tasksForWeek(cw).filter(t => !t.dueDate && t.status === "open");
+  const dailyToday = S.habits.filter(h => !h.archived && h.kind === "daily" && habitActiveOn(h, now) && h.startDate <= today).sort(byOrder);
+  const deadlines = upcomingDeadlines(5);
+  const needsSetup = !S.courses.length || !S.tasks.length || !S.habits.length;
+  const trendRows = weekTrend(8).map(r => ({
+    weekKey: r.weekKey,
+    segs: CATS.map(c => ({ val: r[c].done, fill: catColor(c), name: CAT_LABEL[c] })),
+  }));
+  const welcome = needsSetup ? `<div class="card" style="margin-bottom:16px">
+      <h2 style="font:600 16px/1.3 var(--font-display);margin-bottom:6px">Let’s set up your planner</h2>
+      ${[
+        { done: S.courses.length > 0, t: "Add your courses", a: "manage-courses", b: "Add courses" },
+        { done: S.tasks.length > 0, t: "Plan your first task", a: "ws-task", b: "Add task" },
+        { done: S.habits.length > 0, t: "Create a habit", a: "new-habit", b: "Add habit" },
+      ].map((s, i) => `<div class="welcome-step${s.done ? " done" : ""}">
+          <span class="num">${s.done ? "✓" : i + 1}</span><span class="t">${s.t}</span>
+          ${s.done ? "" : `<button class="btn btn-ghost" data-action="${s.a}">${s.b}</button>`}
+        </div>`).join("")}
+    </div>` : "";
+  return `<div class="home-date" style="margin-bottom:2px">${DAYS[isoDow(now)]} ${now.getDate()} ${MONTHS[now.getMonth()]} · Week ${parseWeekKey(cw).week}</div>
+  ${welcome}
+  <div class="home-grid">
+  <div class="home-col">
+    ${overdueBannerHTML(overdue, "all")}
+    <div class="section-label">Today</div>
+    <div class="card">${todays.length
+      ? `<div class="rows">${sortedRows(todays, { hideDate: true })}</div>`
+      : `<div class="empty" style="padding:10px">Nothing due today.</div>`}
+      ${anytime.length ? `<button class="anytime-toggle${UI.homeAnytimeOpen ? " open" : ""}" data-action="toggle-anytime" aria-expanded="${UI.homeAnytimeOpen}">${IC.chev}<span>Anytime this week (${anytime.length})</span></button>
+        ${UI.homeAnytimeOpen ? `<div class="rows">${anytime.map(t => taskRowHTML(t)).join("")}</div>` : ""}` : ""}
+    </div>
+    ${dailyToday.length ? `<div class="section-label">Habits today</div>
+    <div class="habit-chips">${dailyToday.map(h => {
+      const on = habitChecked(h, today);
+      return `<button class="hchip" data-action="habit-chip" data-id="${esc(h.id)}" aria-pressed="${on}">
+        <span class="hdot" style="background:${swColor(h.colorIndex)}"></span>${esc(h.name)}</button>`;
+    }).join("")}</div>` : ""}
+  </div>
+  <div class="home-col">
+    <div class="section-label">This week</div>
+    <div class="ring-cards">${CATS.map(c => {
+      const k = counts[c];
+      return `<button class="ring-card" data-action="ring-nav" data-cat="${c}" aria-label="${CAT_LABEL[c]}: ${k.done} of ${k.done + k.open} done">
+        ${ringSVG(k.done, k.done + k.open, catColor(c), 56)}<span class="lbl">${CAT_LABEL[c]}</span></button>`;
+    }).join("")}</div>
+    <div class="section-label">Completed per week</div>
+    <div class="card"><div class="chart-wrap">${stackedBarsSVG(trendRows, { ariaLabel: "Completed tasks per week by category" })}
+      ${legendHTML(CATS.map(c => ({ fill: catColor(c), name: CAT_LABEL[c] })))}
+      <div class="chart-caption">${S.tasks.some(t => t.status === "done") ? "" : "Complete tasks to build your trend."}</div></div>
+    ${deadlines.length ? `<div class="section-label">Upcoming deadlines</div>
+    <div class="card"><div class="rows">${deadlines.map(t => taskRowHTML(t, { longDate: true })).join("")}</div></div>` : ""}
+  </div>
+  </div>`;
+}
+
+function viewPlanner() {
+  const cat = UI.plannerTab, wk = UI.weekKey, cw = currentWeekKey();
+  const all = tasksForWeek(wk, cat);
+  const deadlines = all.filter(t => t.isDeadline).sort((a, b) => String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")));
+  const normal = all.filter(t => !t.isDeadline);
+  const catOverdue = wk === cw ? overdueTasks().filter(t => t.category === cat) : [];
+  let body = "";
+  if (cat === "study") {
+    const courses = activeCourses();
+    const showAll = compareWeekKeys(wk, cw) >= 0;
+    const cards = [];
+    for (const c of [...S.courses].sort(byOrder)) {
+      const tasks = normal.filter(t => t.courseId === c.id);
+      const summary = S.weeklySummaries[wk]?.courses?.[c.id]?.text || "";
+      const visible = c.archived ? (tasks.length || summary) : (showAll || tasks.length || summary);
+      if (!visible) continue;
+      cards.push(courseCardHTML(c, tasks, summary, wk));
+    }
+    // no courseId, or a courseId whose course no longer exists (dangling ref)
+    const generalTasks = normal.filter(t => !t.courseId || !courseById(t.courseId));
+    if (generalTasks.length) cards.push(courseCardHTML(null, generalTasks, "", wk));
+    if (!courses.length && !cards.length) {
+      body = `<div class="card empty" style="margin-top:14px">
+        <div class="big">No courses yet</div>
+        Courses give your tasks a color and a home.
+        <br><button class="btn btn-primary" data-action="manage-courses">Add your first course</button></div>`;
+    } else {
+      body = `<div class="stack" style="margin-top:12px">${cards.join("")}</div>
+        ${!normal.length && !deadlines.length ? peekNextHTML(cat) : ""}`;
+    }
+    body += `<div style="text-align:center;margin-top:12px"><button class="btn-quiet" data-action="manage-courses">${IC.gear}&nbsp; Manage courses</button></div>`;
+  } else {
+    const summary = cat === "work" ? (S.weeklySummaries[wk]?.work?.text || "") : "";
+    body = `<div class="card" style="margin-top:12px">
+      <div class="section-label" style="margin:0 0 6px">${cat === "work" ? "To finish this week" : "This week"}</div>
+      ${normal.length ? `<div class="rows">${sortedRows(normal)}</div>` : `<div class="empty" style="padding:12px">No tasks yet for this week.</div>`}
+      <button class="ghost-add" data-action="open-task-sheet" data-cat="${cat}" data-week="${wk}">${IC.plus}<span>Add task</span></button>
+    </div>
+    ${cat === "work" ? summaryBlockHTML("work", wk, summary, "Week notes") : ""}
+    ${!normal.length && !deadlines.length ? peekNextHTML(cat) : ""}`;
+  }
+  return `<div class="seg seg-planner" style="margin-bottom:6px">${CATS.map(c =>
+      `<button data-action="planner-tab" data-tab="${c}" aria-current="${UI.plannerTab === c}">${CAT_LABEL[c]}</button>`).join("")}</div>
+    ${weekbarHTML()}
+    ${overdueBannerHTML(catOverdue, cat)}
+    ${quickAddHTML(cat, wk)}
+    ${deadlines.length ? `<div class="section-label">Deadlines this week</div>
+      <div class="card"><div class="rows">${deadlines.map(t => taskRowHTML(t, { longDate: true })).join("")}</div></div>` : ""}
+    ${body}
+    ${insightsHTML(cat)}`;
+}
+function courseCardHTML(course, tasks, summary, wk) {
+  const color = course ? swColor(course.colorIndex) : "var(--surface-3)";
+  const name = course ? course.name : "General";
+  const done = tasks.filter(t => t.status === "done").length;
+  const editing = UI.editingSummary === (course ? course.id : null) + "|" + wk;
+  return `<div class="card course-card" style="border-left-color:${color}">
+    <div class="course-head">
+      <span class="course-name">${esc(name)}${course && course.archived ? ' <small style="color:var(--text-3);font:500 11px var(--font-ui)">archived</small>' : ""}</span>
+      ${tasks.length ? `<span class="course-count">${done}/${tasks.length} done</span>` : ""}
+    </div>
+    ${tasks.length ? `<div class="rows" style="margin-top:4px">${sortedRows(tasks, { hideContext: true })}</div>` : ""}
+    <button class="ghost-add" data-action="open-task-sheet" data-cat="study" data-week="${wk}" ${course ? `data-course="${esc(course.id)}"` : ""}>${IC.plus}<span>Add task</span></button>
+    ${course ? summaryBlockHTML(course.id, wk, summary, "Week summary", editing) : ""}
+  </div>`;
+}
+function summaryBlockHTML(scope, wk, text, label, editingOverride) {
+  const editing = editingOverride != null ? editingOverride : UI.editingSummary === scope + "|" + wk;
+  const inner = editing
+    ? `<textarea class="summary-edit" rows="3" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">${esc(text)}</textarea>`
+    : `<button class="summary-preview${text ? "" : " empty"}" data-action="summary-edit" data-scope="${esc(scope)}" data-week="${wk}">${text ? esc(text) : "Add a summary for this week…"}</button>`;
+  const wrap = scope === "work"
+    ? `<div class="card" style="margin-top:12px"><div class="summary-block" style="border-top:0;margin-top:0;padding-top:0"><div class="lbl">${label} · week ${parseWeekKey(wk).week}</div>${inner}</div></div>`
+    : `<div class="summary-block"><div class="lbl">${label}</div>${inner}</div>`;
+  return wrap;
+}
+
+function viewCalendar() {
+  const y = UI.calYear, m = UI.calMonth0;
+  const weeks = calendarMonth(y, m);
+  const anyItems = weeks.some(w => w.days.some(d => d.items.length));
+  const dows = ["M", "T", "W", "T", "F", "S", "S"];
+  const dows3 = DAY3;
+  let grid = `<div class="cal-dow"></div>` + dows.map((d, i) =>
+    `<div class="cal-dow"><span class="l1">${d}</span><span class="l3">${dows3[i]}</span></div>`).join("");
+  for (const w of weeks) {
+    grid += `<button class="cal-wk" data-action="cal-week-jump" data-week="${w.weekKey}" aria-label="Open week ${parseWeekKey(w.weekKey).week} in planner">W${parseWeekKey(w.weekKey).week}</button>`;
+    for (const d of w.days) {
+      const dots = d.items.slice(0, 4).map(t =>
+        `<span class="cal-dot${t.isDeadline ? " diamond" : ""}${t.status === "done" ? " done" : ""}" style="background:${taskColor(t)}"></span>`).join("") +
+        (d.items.length > 4 ? `<span class="cal-more">+</span>` : "");
+      const pills = d.items.slice(0, 3).map(t =>
+        `<span class="cal-pill${t.status === "done" ? " done" : ""}" style="background:${catSoft(t.category)}">${t.isDeadline ? "◆ " : ""}${esc(t.title)}</span>`).join("") +
+        (d.items.length > 3 ? `<span class="cal-pill-more">+${d.items.length - 3} more</span>` : "");
+      grid += `<button class="cal-cell${d.inMonth ? "" : " out"}${d.isToday ? " today" : ""}" data-action="cal-day" data-date="${d.dateKey}" aria-label="${fmtDateShort(d.dateKey)}, ${d.items.length} item${d.items.length === 1 ? "" : "s"}">
+        <span class="cal-num">${d.day}</span>
+        ${d.items.length ? `<span class="cal-dots">${dots}</span><span class="cal-pills">${pills}</span>` : ""}
+      </button>`;
+    }
+  }
+  const isThisMonth = y === new Date().getFullYear() && m === new Date().getMonth();
+  return `<div class="cal-head">
+      <button class="icon-btn" data-action="cal-nav" data-dir="-1" aria-label="Previous month">${IC.left}</button>
+      <span class="cal-title">${MONTHS[m]} ${y}</span>
+      ${isThisMonth ? "" : `<button class="today-btn" data-action="cal-today">Today</button>`}
+      <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Next month">${IC.right}</button>
+    </div>
+    <div class="cal-grid">${grid}</div>
+    ${anyItems ? "" : `<div class="cal-empty-note">Tasks with a date will show up here.</div>`}`;
+}
+
+function viewHabits() {
+  const wk = UI.weekKey;
+  const today = todayKey();
+  const daily = S.habits.filter(h => !h.archived && h.kind === "daily").sort(byOrder);
+  const weekly = S.habits.filter(h => !h.archived && h.kind === "weekly").sort(byOrder);
+  const archived = S.habits.filter(h => h.archived).sort(byOrder);
+  const ds = weekDates(wk);
+  let out = weekbarHTML();
+  if (!daily.length && !weekly.length) {
+    out += `<div class="card empty" style="margin-top:14px">
+      <div class="big">No habits yet</div>
+      Habits you check off daily, or weekly goals like “Gym 3×”.
+      <br><button class="btn btn-primary" data-action="new-habit">New habit</button></div>`;
+  }
+  if (daily.length) {
+    out += `<div class="section-label">Daily habits</div><div class="stack">` + daily.map(h => {
+      const st = habitStreaks(h);
+      const pct = habit28dPct(h);
+      const expanded = UI.expandedHabit === h.id;
+      const cells = ds.map(d => {
+        const dk = dateKeyOf(d);
+        const active = habitActiveOn(h, d) && dk >= h.startDate;
+        const future = dk > today;
+        const on = habitChecked(h, dk);
+        return `<span class="hday${dk === today ? " today" : ""}">
+          <span class="dlbl">${DAY3[isoDow(d)][0]}</span>
+          <button class="hcell${dk === today ? " today" : ""}" data-action="hcell" data-id="${esc(h.id)}" data-date="${dk}"
+            aria-pressed="${on}" aria-label="${esc(h.name)} on ${fmtDateShort(dk)}" ${(!active || future) ? "disabled" : ""}>${IC.check}</button>
+        </span>`;
+      }).join("");
+      return `<div class="card habit-card">
+        <button class="hd" data-action="habit-expand" data-id="${esc(h.id)}" aria-expanded="${expanded}">
+          <span class="cat-dot" style="background:${swColor(h.colorIndex)}"></span>
+          <span class="habit-name">${esc(h.name)}</span>
+          <span class="habit-stats">${st.current > 0 ? `<span class="streak">${IC.flame}${st.current}</span>` : ""}${pct != null ? `<span>${pct}%</span>` : ""}</span>
+        </button>
+        <div class="habit-days">${cells}</div>
+        ${expanded ? habitDetailHTML(h) : ""}
+      </div>`;
+    }).join("") + `</div>`;
+  }
+  if (weekly.length) {
+    out += `<div class="section-label">Weekly goals</div><div class="stack">` + weekly.map(h => {
+      const p = habitWeekProgress(h, wk);
+      const futureWeek = compareWeekKeys(wk, currentWeekKey()) > 0;
+      const segs = Array.from({ length: Math.max(p.target, p.logged) }, (_, i) =>
+        `<i class="${i < p.logged ? (i < p.target ? "on" : "extra") : ""}"></i>`).join("");
+      const doneAll = p.logged >= p.target;
+      return `<div class="card">
+        <div class="hd" style="display:flex;align-items:center;gap:10px">
+          <span class="cat-dot" style="background:${swColor(h.colorIndex)}"></span>
+          <button class="habit-name" style="text-align:left;flex:1" data-action="edit-habit" data-id="${esc(h.id)}">${esc(h.name)}</button>
+          <span class="habit-stats">${doneAll ? "Done — " : ""}${Number(p.logged) || 0} of ${Number(p.target) || 0}</span>
+        </div>
+        <div class="goal-row">
+          <div class="goal-segs">${segs}</div>
+          ${p.logged > 0 && !futureWeek ? `<button class="plus-btn" style="width:36px;height:36px;font-size:16px" data-action="goal-minus" data-id="${esc(h.id)}" data-week="${wk}" aria-label="Remove one">−</button>` : ""}
+          <button class="plus-btn" data-action="goal-plus" data-id="${esc(h.id)}" data-week="${wk}" aria-label="Log one" ${futureWeek ? "disabled" : ""}>+</button>
+        </div>
+      </div>`;
+    }).join("") + `</div>`;
+  }
+  if (daily.length || weekly.length) {
+    out += `<div style="text-align:center;margin-top:16px"><button class="btn btn-ghost" data-action="new-habit">${IC.plus}&nbsp;New habit</button></div>`;
+  }
+  if (archived.length) {
+    out += `<div class="section-label"><button class="btn-quiet" style="text-transform:inherit;letter-spacing:inherit;font-size:inherit;color:inherit" data-action="toggle-archived-habits">Archived (${archived.length}) ${UI.archivedHabitsOpen ? "▾" : "▸"}</button></div>`;
+    if (UI.archivedHabitsOpen) {
+      out += `<div class="card"><div class="rows">` + archived.map(h =>
+        `<div class="row"><span class="cat-dot" style="background:${swColor(h.colorIndex)}"></span>
+          <span class="row-main"><span class="row-title" style="color:var(--text-2)">${esc(h.name)}</span></span>
+          <button class="btn-quiet" data-action="habit-restore" data-id="${esc(h.id)}">Restore</button>
+          <button class="btn-quiet" style="color:var(--danger)" data-action="habit-delete" data-id="${esc(h.id)}">${UI.confirm2 === h.id ? "Really delete?" : "Delete"}</button>
+        </div>`).join("") + `</div></div>`;
+    }
+  }
+  return out;
+}
+function habitDetailHTML(h) {
+  const today = todayKey();
+  let rows = "";
+  for (let wOff = 3; wOff >= 0; wOff--) {
+    const k = addWeeks(currentWeekKey(), -wOff);
+    rows += weekDates(k).map(d => {
+      const dk = dateKeyOf(d);
+      const na = !habitActiveOn(h, d) || dk < h.startDate || dk > today;
+      return `<i class="${habitChecked(h, dk) ? "on" : na ? "na" : ""}" title="${dk}"></i>`;
+    }).join("");
+  }
+  return `<div class="habit-detail">
+    <div><div style="font-size:11px;color:var(--text-3);margin-bottom:5px">Last 4 weeks</div><div class="dotmatrix">${rows}</div></div>
+    <div style="text-align:center"><div style="font-size:11px;color:var(--text-3);margin-bottom:5px">8-week trend</div>${sparklineSVG(habitCompletionSeries(h, 8))}</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" data-action="edit-habit" data-id="${esc(h.id)}">Edit</button>
+      <button class="btn-quiet" data-action="habit-archive" data-id="${esc(h.id)}">Archive</button>
+    </div>
+  </div>`;
+}
+
+const VIEWS = { home: viewHome, planner: viewPlanner, calendar: viewCalendar, habits: viewHabits };
+/* ============================================================
+   sheets
+   ============================================================ */
+const SHEETS = {
+  task(p) {
+    const d = p.draft;
+    const isEdit = !!p.id;
+    const wk = d.weekKey;
+    const courses = activeCourses();
+    const movesTo = d.dueDate && weekKeyOf(parseDateKey(d.dueDate)) !== wk ? weekKeyOf(parseDateKey(d.dueDate)) : null;
+    const tpl = isEdit && p.templateId ? findById(S.recurringTemplates, p.templateId) : null;
+    return `<h2>${isEdit ? "Edit task" : "New task"}</h2>
+    <div class="field"><input class="text-input" type="text" placeholder="What needs to be done?" value="${esc(d.title)}" data-draft-field="title" data-autofocus aria-label="Task title"></div>
+    ${p.lockCategory ? "" : `<div class="field"><label>Category</label><div class="chip-row">${CATS.map(c =>
+      `<button class="chip" data-action="ts-cat" data-cat="${c}" aria-pressed="${d.category === c}"><span class="cdot" style="background:${catColor(c)}"></span>${CAT_LABEL[c]}</button>`).join("")}</div></div>`}
+    ${d.category === "study" && courses.length ? `<div class="field"><label>Course</label><div class="chip-row">
+      ${courses.map(c => `<button class="chip" data-action="ts-course" data-id="${esc(c.id)}" aria-pressed="${d.courseId === c.id}"><span class="cdot" style="background:${swColor(c.colorIndex)}"></span>${esc(c.name)}</button>`).join("")}
+      <button class="chip" data-action="ts-course" data-id="" aria-pressed="${!d.courseId}">None</button>
+    </div></div>` : ""}
+    ${d.repeat ? "" : `<div class="field"><label>When — week ${parseWeekKey(wk).week}</label><div class="chip-row">
+      ${weekDates(wk).map(day => { const dk = dateKeyOf(day); return `<button class="chip" data-action="ts-day" data-date="${dk}" aria-pressed="${d.dueDate === dk}">${DAY3[isoDow(day)]} <small>${day.getDate()}</small></button>`; }).join("")}
+      <button class="chip" data-action="ts-day" data-date="" aria-pressed="${!d.dueDate}">No day</button>
+    </div>
+    <input class="text-input" type="date" style="margin-top:9px" value="${esc(d.dueDate || "")}" data-ts-date aria-label="Or pick a date">
+    ${movesTo ? `<div class="hint">This date is in week ${parseWeekKey(movesTo).week} — the task will move there.</div>` : ""}
+    </div>`}
+    <div class="switch-row"><span><span class="lbl">Deadline</span><br><span class="sub">Marked with ◆ and tracked on Home</span></span>
+      <button class="switch" data-action="ts-deadline" role="switch" aria-checked="${d.isDeadline}" aria-pressed="${d.isDeadline}" aria-label="Deadline"></button></div>
+    ${!isEdit ? `<div class="switch-row"><span><span class="lbl">Repeats weekly</span><br><span class="sub">Appears in every week from week ${parseWeekKey(wk).week}</span></span>
+      <button class="switch" data-action="ts-repeat" role="switch" aria-checked="${!!d.repeat}" aria-pressed="${!!d.repeat}" aria-label="Repeats weekly"></button></div>` : ""}
+    ${tpl && !tpl.archived ? `<div class="switch-row"><span><span class="lbl">Repeats weekly</span><br><span class="sub">Editing changes only this week’s copy</span></span>
+      <button class="btn-quiet" data-action="ts-stop-repeat" data-id="${esc(tpl.id)}">Stop repeating</button></div>` : ""}
+    <div class="field" style="margin-top:10px"><textarea class="text-input" rows="2" placeholder="Notes (optional)" data-draft-field="notes">${esc(d.notes)}</textarea></div>
+    <div class="sheet-footer">
+      ${isEdit ? `<button class="btn-danger" data-action="ts-delete" data-id="${esc(p.id)}">Delete</button>` : ""}
+      <button class="btn btn-primary" data-action="ts-save">${isEdit ? "Save" : "Add task"}</button>
+    </div>`;
+  },
+  courses() {
+    const active = S.courses.filter(c => !c.archived).sort(byOrder);
+    const archived = S.courses.filter(c => c.archived).sort(byOrder);
+    return `<h2>Courses</h2>
+    ${active.length ? `<div>${active.map(c => `<div class="mgr-row">
+      <button class="color-dot-btn" style="background:${swColor(c.colorIndex)}" data-action="course-color" data-id="${esc(c.id)}" aria-label="Change color of ${esc(c.name)}"></button>
+      <input type="text" value="${esc(c.name)}" data-course-name="${esc(c.id)}" aria-label="Course name">
+      <button class="btn-quiet" data-action="course-archive" data-id="${esc(c.id)}">Archive</button>
+    </div>`).join("")}</div>` : `<div class="empty" style="padding:10px 0 16px">Add the courses you’re taking — each gets its own color.</div>`}
+    <form class="mgr-row" data-form="course-add" style="border-top:1px solid var(--border)">
+      <span class="color-dot-btn" style="background:${swColor(active.length + archived.length)};border-style:dashed"></span>
+      <input type="text" placeholder="New course name…" id="new-course-name" aria-label="New course name">
+      <button type="submit" class="btn btn-ghost" style="min-height:36px">Add</button>
+    </form>
+    ${archived.length ? `<div class="section-label" style="margin-top:14px">Archived</div>${archived.map(c => `<div class="mgr-row">
+      <span class="color-dot-btn" style="background:${swColor(c.colorIndex)};opacity:.5"></span>
+      <span style="flex:1;color:var(--text-3)">${esc(c.name)}</span>
+      <button class="btn-quiet" data-action="course-restore" data-id="${esc(c.id)}">Restore</button>
+      ${S.tasks.some(t => t.courseId === c.id) || S.recurringTemplates.some(r => r.courseId === c.id) ? "" : `<button class="btn-quiet" style="color:var(--danger)" data-action="course-delete" data-id="${esc(c.id)}">${UI.confirm2 === c.id ? "Really delete?" : "Delete"}</button>`}
+    </div>`).join("")}` : ""}
+    <div class="sheet-footer"><button class="btn btn-primary" data-action="sheet-close">Done</button></div>`;
+  },
+  habit(p) {
+    const d = p.draft;
+    const isEdit = !!p.id;
+    return `<h2>${isEdit ? "Edit habit" : "New habit"}</h2>
+    <div class="field"><input class="text-input" type="text" placeholder="e.g. Read 20 minutes" value="${esc(d.name)}" data-draft-field="name" data-autofocus aria-label="Habit name"></div>
+    <div class="field"><label>Type</label><div class="chip-row">
+      <button class="chip" data-action="hs-kind" data-kind="daily" aria-pressed="${d.kind === "daily"}">Daily check-off</button>
+      <button class="chip" data-action="hs-kind" data-kind="weekly" aria-pressed="${d.kind === "weekly"}">Weekly goal</button>
+    </div></div>
+    ${d.kind === "weekly" ? `<div class="field"><label>Target per week</label>
+      <div class="stepper"><button type="button" data-action="hs-target" data-d="-1" aria-label="Less">−</button><span class="val">${d.weeklyTarget} × / week</span><button type="button" data-action="hs-target" data-d="1" aria-label="More">+</button></div></div>`
+    : `<div class="field"><label>On days</label><div class="chip-row">${DAY3.map((n, i) =>
+        `<button class="chip" style="min-height:34px;padding:0 11px" data-action="hs-day" data-n="${i + 1}" aria-pressed="${d.activeDays.includes(i + 1)}">${n}</button>`).join("")}</div></div>`}
+    <div class="field"><label>Color</label><div class="swatches">${Array.from({ length: 12 }, (_, i) =>
+      `<button class="swatch" style="background:${swColor(i)}" data-action="hs-swatch" data-i="${i}" aria-pressed="${d.colorIndex === i}" aria-label="Color ${i + 1}"></button>`).join("")}</div></div>
+    <div class="sheet-footer">
+      ${isEdit ? `<button class="btn-danger" data-action="habit-archive" data-id="${esc(p.id)}" data-close="1">Archive</button>` : ""}
+      <button class="btn btn-primary" data-action="hs-save">${isEdit ? "Save" : "Add habit"}</button>
+    </div>`;
+  },
+  day(p) {
+    const items = tasksOnDate(p.dateKey);
+    const wk = weekKeyOf(parseDateKey(p.dateKey));
+    return `<h2>${fmtDateShort(p.dateKey)} · Week ${parseWeekKey(wk).week}</h2>
+    ${items.length ? `<div class="rows">${items.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : `<div class="empty" style="padding:10px">Nothing planned on this day.</div>`}
+    <div class="sheet-footer">
+      <button class="btn btn-ghost" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wk)}" data-date="${esc(p.dateKey)}">${IC.plus}&nbsp;Add task on this day</button>
+    </div>`;
+  },
+  weekjump() {
+    const base = UI.weekKey, cw = currentWeekKey();
+    let rows = "";
+    for (let off = -8; off <= 8; off++) {
+      const k = addWeeks(base, off);
+      const w = parseWeekKey(k);
+      const counts = weekCounts(k);
+      rows += `<button class="row" style="width:100%;text-align:left" data-action="weekjump-pick" data-week="${k}">
+        <span class="row-main"><span class="row-title" style="font-weight:${k === base ? 700 : 500}">Week ${w.week}${w.year !== isoWeekOf(new Date()).year ? " · " + w.year : ""}</span>
+        <span class="row-meta">${weekRangeLabel(k)}${k === cw ? " · this week" : ""}</span></span>
+        ${counts.total.open + counts.total.done ? `<span class="date-chip">${counts.total.done}/${counts.total.open + counts.total.done}</span>` : ""}
+      </button>`;
+    }
+    return `<h2>Jump to week</h2><div class="rows" style="max-height:52dvh;overflow-y:auto">${rows}</div>`;
+  },
+  sync(p) {
+    const connected = mode === "github";
+    const tokenSet = !!ghToken();
+    const status = connected
+      ? "Connected — this device reads and saves the shared planner."
+      : tokenSet
+        ? "A sync code is saved here but isn’t working right now."
+        : "Paste your sync code once and this device joins the shared planner.";
+    return `<h2>Sync</h2>
+    <p class="hint" style="margin:0 0 12px">${status}</p>
+    ${tokenSet ? "" : `<p class="hint" style="margin:0 0 12px">To make a code: github.com → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate. Repository access: only <b>weekwise-data</b>. Permissions: <b>Contents — Read and write</b>. Copy the code that starts with “github_pat_”.</p>`}
+    <div class="field"><label>Sync code</label><input class="text-input" type="password" placeholder="github_pat_…" data-draft-field="token" autocomplete="off" data-autofocus></div>
+    <div class="sheet-footer" style="margin-top:6px">
+      ${tokenSet ? `<button class="btn-danger" data-action="sync-disconnect">Disconnect</button>` : ""}
+      <button class="btn btn-primary" data-action="sync-connect">Connect</button>
+    </div>
+    <div class="field" style="margin-top:20px"><label>Restore from a backup</label>
+      <textarea class="text-input" rows="3" placeholder="Paste a WeekWise backup (JSON) here…" data-draft-field="importJson"></textarea>
+      <div class="sheet-footer" style="margin-top:8px">
+        <button class="btn btn-ghost" data-action="open-export">Show my backup</button>
+        <button class="btn btn-ghost" data-action="sync-import">${p.confirmImport ? "Replace current data?" : "Import"}</button>
+      </div>
+    </div>`;
+  },
+  export() {
+    return `<h2>Backup</h2>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:10px">Copy this JSON somewhere safe. It contains all your planner data.</p>
+    <textarea class="text-input" rows="8" readonly id="export-json">${esc(JSON.stringify(S))}</textarea>
+    <div class="sheet-footer"><button class="btn btn-ghost" data-action="export-select">Select all</button>
+    <button class="btn btn-primary" data-action="sheet-close">Done</button></div>`;
+  },
+};
+/* ============================================================
+   actions, router, render, boot
+   ============================================================ */
+function syncDraftInputs() {
+  if (!UI.sheet || !UI.sheet.params.draft) return;
+  document.querySelectorAll("#sheet-root [data-draft-field]").forEach(el => {
+    UI.sheet.params.draft[el.dataset.draftField] = el.value;
+  });
+}
+function newTaskParams(ds) {
+  return {
+    lockCategory: false,
+    draft: {
+      title: "", category: CATS.includes(ds.cat) ? ds.cat : "personal",
+      courseId: ds.course || null, weekKey: parseWeekKey(ds.week || "") ? ds.week : UI.weekKey,
+      dueDate: ds.date || null, isDeadline: false, notes: "", repeat: false,
+    },
+  };
+}
+let summaryPending = null, summaryTimer = null;
+function flushSummary() {
+  if (!summaryPending) return;
+  clearTimeout(summaryTimer);
+  const p = summaryPending; summaryPending = null;
+  if (mode === "readonly" || mode === "load-error" || futureVersion) return;
+  dispatch({ t: "summary.set", weekKey: p.week, scope: p.scope, text: p.text }, { silent: true });
+}
+function currentCW() { return currentWeekKey(); }
+
+const ACTIONS = {
+  nav(el) { navTo(el.dataset.view, el.dataset.tab || null); },
+  "planner-tab"(el) { navTo("planner", el.dataset.tab); },
+  "week-nav"(el) { UI.weekKey = addWeeks(UI.weekKey, +el.dataset.dir); render(); },
+  "week-today"() { UI.weekKey = currentCW(); render(); },
+  "week-jump"() { openSheet("weekjump"); },
+  "weekjump-pick"(el) { UI.weekKey = el.dataset.week; closeSheet(); },
+  "toggle-task"(el) {
+    const t = findById(S.tasks, el.dataset.id); if (!t) return;
+    const done = t.status !== "done";
+    dispatch({ t: "task.patch", id: t.id, patch: { status: done ? "done" : "open", doneAt: done ? nowIso() : null } });
+    if (UI.sheet) renderSheet();
+  },
+  "edit-task"(el) {
+    const t = findById(S.tasks, el.dataset.id); if (!t) return;
+    openSheet("task", { id: t.id, templateId: t.templateId, lockCategory: false, draft: {
+      title: t.title, category: t.category, courseId: t.courseId, weekKey: t.weekKey,
+      dueDate: t.dueDate, isDeadline: t.isDeadline, notes: t.notes, repeat: false,
+    }});
+  },
+  "open-task-sheet"(el) { openSheet("task", newTaskParams(el.dataset)); },
+  "ws-task"() { openSheet("task", newTaskParams({ cat: "study", week: currentCW() })); },
+  "ts-cat"(el) { syncDraftInputs(); const d = UI.sheet.params.draft; d.category = el.dataset.cat; if (d.category !== "study") d.courseId = null; renderSheet(); },
+  "ts-course"(el) { syncDraftInputs(); UI.sheet.params.draft.courseId = el.dataset.id || null; renderSheet(); },
+  "ts-day"(el) { syncDraftInputs(); UI.sheet.params.draft.dueDate = el.dataset.date || null; renderSheet(); },
+  "ts-deadline"() { syncDraftInputs(); const d = UI.sheet.params.draft; d.isDeadline = !d.isDeadline; renderSheet(); },
+  "ts-repeat"() { syncDraftInputs(); const d = UI.sheet.params.draft; d.repeat = !d.repeat; if (d.repeat) d.dueDate = null; renderSheet(); },
+  "ts-stop-repeat"(el) {
+    dispatch({ t: "template.patch", id: el.dataset.id, patch: { archived: true } }, { silent: true });
+    toast("This task won’t repeat in future weeks.");
+    renderSheet();
+  },
+  "ts-save"() {
+    syncDraftInputs();
+    const p = UI.sheet.params, d = p.draft;
+    if (!d.title.trim()) { const t = document.querySelector('#sheet-root [data-draft-field="title"]'); if (t) t.focus(); return; }
+    const courseId = d.category === "study" ? d.courseId : null;
+    if (p.id) {
+      const weekKey = d.dueDate ? weekKeyOf(parseDateKey(d.dueDate)) : d.weekKey;
+      dispatch({ t: "task.patch", id: p.id, patch: {
+        title: d.title.trim(), category: d.category, courseId,
+        dueDate: d.dueDate, isDeadline: d.isDeadline, notes: d.notes, weekKey,
+      }}, { silent: true });
+    } else if (d.repeat) {
+      dispatch({ t: "template.upsert", template: {
+        id: newId("rt"), title: d.title.trim(), category: d.category, courseId, label: null,
+        notes: d.notes, fromWeek: d.weekKey, untilWeek: null, skipWeeks: [], archived: false,
+        sortOrder: nextSortOrder(S.recurringTemplates), createdAt: nowIso(), updatedAt: nowIso(),
+      }}, { silent: true });
+      materializeWeek(d.weekKey);
+    } else {
+      const weekKey = d.dueDate ? weekKeyOf(parseDateKey(d.dueDate)) : d.weekKey;
+      dispatch({ t: "task.upsert", task: {
+        id: newId("t"), title: d.title.trim(), category: d.category, courseId, label: null,
+        weekKey, dueDate: d.dueDate, isDeadline: d.isDeadline, status: "open", doneAt: null,
+        notes: d.notes, templateId: null, sortOrder: nextSortOrder(S.tasks),
+        createdAt: nowIso(), updatedAt: nowIso(),
+      }}, { silent: true });
+    }
+    closeSheet();
+  },
+  "ts-delete"(el) {
+    const t = findById(S.tasks, el.dataset.id); if (!t) return;
+    const copy = { ...t };
+    // Skip the week baked into the instance id, not the task's current weekKey —
+    // a moved instance must not resurrect in its origin week (or skip the wrong one).
+    const m = /^ti_.+_(\d{4}-W\d{2})$/.exec(t.id);
+    const skipWeek = t.templateId ? (m ? m[1] : t.weekKey) : null;
+    dispatch({ t: "task.delete", id: t.id, templateId: t.templateId, weekKey: skipWeek }, { silent: true });
+    closeSheet();
+    toast("Task deleted", { label: "Undo", fn: () => {
+      dispatch({ t: "task.upsert", task: copy }, { silent: true });
+      if (copy.templateId) {
+        const r = findById(S.recurringTemplates, copy.templateId);
+        if (r) dispatch({ t: "template.patch", id: r.id, patch: { skipWeeks: r.skipWeeks.filter(k => k !== skipWeek) } }, { silent: true });
+      }
+      render();
+    }});
+  },
+  "toggle-anytime"() { UI.homeAnytimeOpen = !UI.homeAnytimeOpen; render(); },
+  "toggle-overdue"() { UI.overdueOpen = !UI.overdueOpen; render(); },
+  "overdue-move"(el) {
+    const scope = el.dataset.scope, cw = currentCW();
+    const list = overdueTasks().filter(t => scope === "all" || t.category === scope);
+    const prev = list.map(t => ({ id: t.id, weekKey: t.weekKey, dueDate: t.dueDate }));
+    for (const t of list) dispatch({ t: "task.patch", id: t.id, patch: { weekKey: cw, dueDate: null } }, { silent: true });
+    UI.overdueOpen = false;
+    render();
+    toast(`Moved ${list.length} task${list.length === 1 ? "" : "s"} to this week`, { label: "Undo", fn: () => {
+      for (const p of prev) dispatch({ t: "task.patch", id: p.id, patch: { weekKey: p.weekKey, dueDate: p.dueDate } }, { silent: true });
+      render();
+    }});
+  },
+  "reload-app"() { location.reload(); },
+  "ring-nav"(el) { UI.weekKey = currentCW(); navTo("planner", el.dataset.cat); },
+  "insights-toggle"(el) { const c = el.dataset.cat; UI.insightsOpen[c] = !UI.insightsOpen[c]; saveUiPrefs(); render(); },
+  "manage-courses"() { openSheet("courses"); },
+  "course-color"(el) {
+    const c = courseById(el.dataset.id); if (!c) return;
+    dispatch({ t: "course.patch", id: c.id, patch: { colorIndex: (c.colorIndex + 1) % 12 } }, { silent: true });
+    renderSheet();
+  },
+  "course-archive"(el) { dispatch({ t: "course.patch", id: el.dataset.id, patch: { archived: true } }, { silent: true }); renderSheet(); },
+  "course-restore"(el) { dispatch({ t: "course.patch", id: el.dataset.id, patch: { archived: false } }, { silent: true }); renderSheet(); },
+  "course-delete"(el) {
+    const id = el.dataset.id;
+    if (UI.confirm2 !== id) { UI.confirm2 = id; renderSheet(); return; }
+    UI.confirm2 = null;
+    dispatch({ t: "course.delete", id }, { silent: true });
+    renderSheet();
+  },
+  "summary-edit"(el) {
+    UI.editingSummary = el.dataset.scope + "|" + el.dataset.week;
+    render();
+    const ta = document.querySelector(`#view textarea[data-summary="${CSS.escape(el.dataset.scope)}"]`);
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  },
+  "cal-nav"(el) {
+    let m = UI.calMonth0 + +el.dataset.dir, y = UI.calYear;
+    if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
+    UI.calMonth0 = m; UI.calYear = y; render();
+  },
+  "cal-today"() { const n = new Date(); UI.calYear = n.getFullYear(); UI.calMonth0 = n.getMonth(); render(); },
+  "cal-day"(el) { openSheet("day", { dateKey: el.dataset.date }); },
+  "cal-week-jump"(el) { UI.weekKey = el.dataset.week; navTo("planner", UI.plannerTab); },
+  "habit-chip"(el) {
+    const h = habitById(el.dataset.id); if (!h) return;
+    const dk = todayKey();
+    dispatch({ t: "habit.set", habitId: h.id, dateKey: dk, value: habitChecked(h, dk) ? 0 : 1 });
+  },
+  hcell(el) {
+    const h = habitById(el.dataset.id); if (!h) return;
+    const dk = el.dataset.date;
+    dispatch({ t: "habit.set", habitId: h.id, dateKey: dk, value: habitChecked(h, dk) ? 0 : 1 });
+  },
+  "goal-plus"(el) {
+    const wk = el.dataset.week;
+    const dk = wk === currentCW() ? todayKey() : dateKeyOf(mondayOfWeek(wk));
+    dispatch({ t: "habit.delta", habitId: el.dataset.id, dateKey: dk, delta: 1 });
+  },
+  "goal-minus"(el) {
+    const h = habitById(el.dataset.id); if (!h) return;
+    const log = S.habitLog[h.id] || {};
+    const days = weekDates(el.dataset.week).map(dateKeyOf).reverse();
+    const dk = days.find(k => (log[k] || 0) > 0);
+    if (dk) dispatch({ t: "habit.delta", habitId: h.id, dateKey: dk, delta: -1 });
+  },
+  "habit-expand"(el) { UI.expandedHabit = UI.expandedHabit === el.dataset.id ? null : el.dataset.id; render(); },
+  "new-habit"() { openSheet("habit", { draft: { name: "", kind: "daily", weeklyTarget: 3, colorIndex: 3, activeDays: [1, 2, 3, 4, 5, 6, 7] } }); },
+  "edit-habit"(el) {
+    const h = habitById(el.dataset.id); if (!h) return;
+    openSheet("habit", { id: h.id, draft: { name: h.name, kind: h.kind, weeklyTarget: h.weeklyTarget || 3, colorIndex: h.colorIndex, activeDays: [...h.activeDays] } });
+  },
+  "hs-kind"(el) { syncDraftInputs(); UI.sheet.params.draft.kind = el.dataset.kind; renderSheet(); },
+  "hs-target"(el) { syncDraftInputs(); const d = UI.sheet.params.draft; d.weeklyTarget = Math.max(1, Math.min(14, d.weeklyTarget + +el.dataset.d)); renderSheet(); },
+  "hs-swatch"(el) { syncDraftInputs(); UI.sheet.params.draft.colorIndex = +el.dataset.i; renderSheet(); },
+  "hs-day"(el) {
+    syncDraftInputs(); const d = UI.sheet.params.draft; const n = +el.dataset.n;
+    if (d.activeDays.includes(n)) { if (d.activeDays.length > 1) d.activeDays = d.activeDays.filter(x => x !== n); }
+    else d.activeDays = [...d.activeDays, n].sort();
+    renderSheet();
+  },
+  "hs-save"() {
+    syncDraftInputs();
+    const p = UI.sheet.params, d = p.draft;
+    if (!d.name.trim()) { const t = document.querySelector('#sheet-root [data-draft-field="name"]'); if (t) t.focus(); return; }
+    if (p.id) {
+      dispatch({ t: "habit.patch", id: p.id, patch: {
+        name: d.name.trim(), kind: d.kind, colorIndex: d.colorIndex,
+        weeklyTarget: d.kind === "weekly" ? d.weeklyTarget : null,
+        activeDays: d.kind === "daily" ? d.activeDays : [1, 2, 3, 4, 5, 6, 7],
+      }}, { silent: true });
+    } else {
+      dispatch({ t: "habit.upsert", habit: {
+        id: newId("h"), kind: d.kind, name: d.name.trim(), colorIndex: d.colorIndex,
+        activeDays: d.kind === "daily" ? d.activeDays : [1, 2, 3, 4, 5, 6, 7],
+        weeklyTarget: d.kind === "weekly" ? d.weeklyTarget : null,
+        startDate: todayKey(), archived: false, sortOrder: nextSortOrder(S.habits),
+        createdAt: nowIso(), updatedAt: nowIso(),
+      }}, { silent: true });
+    }
+    closeSheet();
+  },
+  "habit-archive"(el) {
+    dispatch({ t: "habit.patch", id: el.dataset.id, patch: { archived: true } }, { silent: true });
+    UI.expandedHabit = null;
+    if (el.dataset.close) closeSheet(); else render();
+  },
+  "habit-restore"(el) { dispatch({ t: "habit.patch", id: el.dataset.id, patch: { archived: false } }); },
+  "habit-delete"(el) {
+    const id = el.dataset.id;
+    if (UI.confirm2 !== id) { UI.confirm2 = id; render(); return; }
+    UI.confirm2 = null;
+    dispatch({ t: "habit.deleteAll", id });
+  },
+  "toggle-archived-habits"() { UI.archivedHabitsOpen = !UI.archivedHabitsOpen; render(); },
+  "open-sync"() { openSheet("sync", { draft: { token: "", importJson: "" } }); },
+  "open-export"() { openSheet("export"); },
+  async "sync-connect"() {
+    syncDraftInputs();
+    const p = UI.sheet.params;
+    const tok = (p.draft.token || "").trim() || ghToken();
+    if (!tok) { document.querySelector('#sheet-root [data-draft-field="token"]')?.focus(); return; }
+    toast("Checking sync code…");
+    let res;
+    try { res = await ghLoad(tok); } catch { res = { error: 0 }; }
+    if (res.authFail) { toast("That code doesn’t work — check its repository access and Contents permission."); return; }
+    if (res.error !== undefined) { toast("Couldn’t reach GitHub — check your connection."); return; }
+    setGhToken(tok);
+    ghAuthFailed = false;
+    if (res.text !== undefined) {
+      ghSha = res.sha;
+      const remote = tryHydrate(res.text);
+      if (remote && remote.seq >= S.meta.seq) {
+        S = remote.data; futureVersion = remote.future; normalize(S); rev++;
+        try { localWrite(res.text); } catch {}
+      } else if (remote) { dirty = true; }
+    } else { ghSha = null; if (S.meta.seq > 0) dirty = true; }
+    mode = futureVersion ? "readonly" : "github";
+    if (dirty) { firstDirtyAt = firstDirtyAt || Date.now(); saveState = "dirty"; scheduleSave(500); }
+    closeSheet();
+    toast("Sync connected ✓");
+  },
+  "sync-disconnect"() {
+    setGhToken(null); ghSha = null; ghAuthFailed = false;
+    if (mode === "github") mode = "local-only";
+    closeSheet();
+    toast("Sync disconnected — this device is local-only now");
+  },
+  "sync-import"() {
+    if (mode === "readonly" || mode === "load-error" || futureVersion) { toast("Editing is paused right now."); return; }
+    syncDraftInputs();
+    const p = UI.sheet.params;
+    const cand = tryHydrate((p.draft.importJson || "").trim());
+    if (!cand || cand.future) { toast(cand ? "That backup is from a newer app version." : "That doesn’t look like a WeekWise backup."); return; }
+    if (!p.confirmImport) { p.confirmImport = true; renderSheet(); return; }
+    S = cand.data; futureVersion = false; normalize(S); rev++;
+    opLog = []; dirty = true; firstDirtyAt = Date.now(); saveState = "dirty"; scheduleSave(300);
+    closeSheet();
+    toast("Backup imported");
+  },
+  "sheet-close"() { closeSheet(); },
+  "toast-action"() { if (toastAction) toastAction(); document.getElementById("toast-root").innerHTML = ""; toastAction = null; },
+  "export-select"() { const t = document.getElementById("export-json"); if (t) { t.focus(); t.select(); } },
+};
+
+/* delegation */
+document.addEventListener("click", (e) => {
+  const g = e.target.closest("g[data-tip]");
+  if (g) {
+    const cap = g.closest(".chart-wrap")?.querySelector(".chart-caption");
+    if (cap) cap.textContent = g.dataset.tip;
+  }
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  // any click that isn't a delete disarms a pending two-step delete confirmation
+  if (!/-delete$/.test(el.dataset.action)) UI.confirm2 = null;
+  const fn = ACTIONS[el.dataset.action];
+  if (fn) { e.preventDefault(); fn(el, e); }
+});
+document.addEventListener("submit", (e) => {
+  const form = e.target.closest("[data-form]");
+  if (!form) return;
+  e.preventDefault();
+  if (form.dataset.form === "quick-add") {
+    const input = form.querySelector("input[type=text]");
+    const title = input.value.trim();
+    if (!title) return;
+    const cat = form.dataset.cat, wk = form.dataset.week;
+    dispatch({ t: "task.upsert", task: {
+      id: newId("t"), title, category: cat, courseId: null, label: null,
+      weekKey: wk, dueDate: null, isDeadline: false, status: "open", doneAt: null,
+      notes: "", templateId: null, sortOrder: nextSortOrder(S.tasks),
+      createdAt: nowIso(), updatedAt: nowIso(),
+    }});
+    const again = document.querySelector(`#view [data-draft-id="qa:${cat}"]`);
+    if (again) again.focus();
+  } else if (form.dataset.form === "course-add") {
+    const input = form.querySelector("#new-course-name");
+    const name = input.value.trim();
+    if (!name) return;
+    dispatch({ t: "course.upsert", course: {
+      id: newId("c"), name, colorIndex: S.courses.length % 12, archived: false,
+      sortOrder: nextSortOrder(S.courses), createdAt: nowIso(), updatedAt: nowIso(),
+    }}, { silent: true });
+    renderSheet();
+    const nn = document.getElementById("new-course-name"); if (nn) nn.focus();
+  }
+});
+document.addEventListener("input", (e) => {
+  const el = e.target;
+  if (el.matches("[data-draft-field]") && UI.sheet?.params?.draft) {
+    UI.sheet.params.draft[el.dataset.draftField] = el.value;
+  } else if (el.matches("[data-summary]")) {
+    summaryPending = { scope: el.dataset.summary, week: el.dataset.week, text: el.value };
+    clearTimeout(summaryTimer);
+    summaryTimer = setTimeout(flushSummary, 600);
+  }
+});
+document.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.matches("[data-ts-date]") && UI.sheet?.params?.draft) {
+    syncDraftInputs();
+    UI.sheet.params.draft.dueDate = el.value || null;
+    renderSheet();
+  } else if (el.matches("[data-course-name]")) {
+    const name = el.value.trim();
+    if (name) dispatch({ t: "course.patch", id: el.dataset.courseName, patch: { name } }, { silent: true });
+  }
+});
+document.addEventListener("focusout", (e) => {
+  if (e.target.matches && e.target.matches("[data-summary]")) {
+    summaryPending = { scope: e.target.dataset.summary, week: e.target.dataset.week, text: e.target.value };
+    flushSummary();
+    UI.editingSummary = null;
+    // Defer the re-render until an in-flight tap finishes dispatching its click —
+    // rebuilding the view between mousedown and mouseup would swallow that tap.
+    const finish = () => { clearTimeout(tid); document.removeEventListener("click", finish, true); setTimeout(render, 0); };
+    const tid = setTimeout(finish, 300);
+    document.addEventListener("click", finish, true);
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && UI.sheet) { closeSheet(); return; }
+  if (e.key === "Tab" && UI.sheet) {
+    const root = document.getElementById("sheet-root");
+    const f = [...root.querySelectorAll("button, input, textarea, select")].filter(el => !el.disabled && el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (document.activeElement === last || !root.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
+  }
+});
+// Lift the bottom sheet above the on-screen keyboard where the embedder exposes it.
+if (window.visualViewport) {
+  const vvHandler = () => {
+    const sheet = document.querySelector("#sheet-root.open .sheet");
+    if (!sheet || window.matchMedia("(min-width: 900px)").matches) return;
+    const kb = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop);
+    sheet.style.bottom = kb + "px";
+  };
+  visualViewport.addEventListener("resize", vvHandler);
+  visualViewport.addEventListener("scroll", vvHandler);
+}
+document.getElementById("save-chip").addEventListener("click", () => {
+  if (saveState === "error" && mode !== "readonly") { dirty = true; saveNow(); }
+});
+
+/* router */
+let suppressHashRender = false;
+function parseHash() {
+  const m = /^#\/(home|planner|calendar|habits)(?:\/(study|work|personal))?/.exec(location.hash);
+  if (!m) return;
+  UI.view = m[1];
+  if (m[1] === "planner" && m[2]) UI.plannerTab = m[2];
+}
+function navTo(view, tab) {
+  UI.view = view;
+  if (tab) { UI.plannerTab = tab; saveUiPrefs(); }
+  const target = view === "planner" ? `#/planner/${UI.plannerTab}` : `#/${view}`;
+  if (location.hash !== target) { suppressHashRender = true; try { location.hash = target; } catch {} }
+  render();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", () => {
+  if (suppressHashRender) { suppressHashRender = false; return; }
+  parseHash(); render();
+});
+
+/* top-level render */
+function render() {
+  if (conflictLock || !S) return;
+  flushSummary();
+  const sheetRoot = document.getElementById("sheet-root");
+  const focusSel = sheetRoot.contains(document.activeElement) ? null : focusSelectorFor(document.activeElement);
+  renderShell();
+  document.getElementById("page-title").textContent =
+    UI.view === "planner" ? CAT_LABEL[UI.plannerTab] : ({ home: "Home", calendar: "Calendar", habits: "Habits" })[UI.view] || "Home";
+  materializeWeek(currentWeekKey());
+  if (UI.view === "planner" || UI.view === "habits") materializeWeek(UI.weekKey);
+  document.getElementById("view").innerHTML = VIEWS[UI.view]();
+  applyPendingDrafts();
+  // Restore keyboard focus to the recreated control so tab position survives
+  // re-renders and assistive tech re-announces the control's new state.
+  if (focusSel && (!document.activeElement || document.activeElement === document.body)) {
+    const el = document.querySelector(focusSel);
+    if (el && !sheetRoot.contains(el)) el.focus({ preventScroll: true });
+  }
+  updateChrome();
+}
+function applyPendingDrafts() {
+  if (!UI.pendingDrafts) return;
+  const drafts = UI.pendingDrafts; UI.pendingDrafts = null;
+  let summaryRestored = false;
+  const canWrite = mode !== "readonly" && mode !== "load-error" && !futureVersion;
+  for (const [k, v] of Object.entries(drafts)) {
+    if (k.startsWith("sum:") && typeof v === "string" && canWrite) {
+      const [scope, week] = k.slice(4).split("|");
+      if (scope && parseWeekKey(week || "")) {
+        try { dispatch({ t: "summary.set", weekKey: week, scope, text: v }, { silent: true }); summaryRestored = true; } catch {}
+      }
+    }
+  }
+  if (summaryRestored) document.getElementById("view").innerHTML = VIEWS[UI.view]();
+  for (const [k, v] of Object.entries(drafts)) {
+    if (!k.startsWith("sum:") && typeof v === "string") {
+      const el = document.querySelector(`[data-draft-id="${CSS.escape(k)}"]`);
+      if (el) el.value = v;
+    }
+  }
+}
+
+boot();
+</script>
+
+</body></html>
