@@ -2079,7 +2079,8 @@ function viewPlanner() {
   const cat = UI.plannerTab, wk = UI.weekKey, cw = currentWeekKey();
   const all = tasksForWeek(wk, cat);
   const deadlines = all.filter(t => t.isDeadline).sort((a, b) => String(a.dueDate || "9").localeCompare(String(b.dueDate || "9")));
-  const normal = all.filter(t => !t.isDeadline);
+  // every task lives in its own card — the deadlines strip above is just an overview of the ◆ ones
+  const normal = all;
   const catOverdue = wk === cw ? overdueTasks().filter(t => t.category === cat) : [];
   let body = "";
   if (cat === "study" || cat === "work") {
