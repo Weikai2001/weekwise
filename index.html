@@ -477,7 +477,7 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
   <div id="main">
     <header id="topbar">
       <h1 class="view-title" id="page-title">Home</h1>
-      <button id="save-chip" type="button" title="Sync status"><span class="dot"></span><span class="chip-text"></span></button>
+      <button id="save-chip" type="button" title="Sync & calendar settings" aria-label="Sync and calendar settings"><span class="dot"></span><span class="chip-text"></span></button>
     </header>
     <div id="banner-slot"></div>
     <main id="view"></main>
@@ -2438,7 +2438,7 @@ const SHEETS = {
       : tokenSet
         ? "A sync code is saved here but isn’t working right now."
         : "Paste your sync code once and this device joins the shared planner.";
-    return `<h2>Sync</h2>
+    return `<h2>Sync &amp; calendars</h2>
     <p class="hint" style="margin:0 0 12px">${status}</p>
     ${tokenSet ? "" : `<p class="hint" style="margin:0 0 12px">To make a code: github.com → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate. Repository access: only <b>weekwise-data</b>. Permissions: <b>Contents — Read and write</b>. Copy the code that starts with “github_pat_”.</p>`}
     <div class="field"><label>Sync code</label><input class="text-input" type="password" placeholder="github_pat_…" data-draft-field="token" autocomplete="off" data-autofocus></div>
@@ -3041,6 +3041,7 @@ if (window.visualViewport) {
 }
 document.getElementById("save-chip").addEventListener("click", () => {
   if (saveState === "error" && mode !== "readonly") { dirty = true; saveNow(); }
+  ACTIONS["open-sync"](); // sync settings: sync code, calendar feeds, backup
 });
 
 /* router */
