@@ -242,6 +242,8 @@ h1, h2, h3, p { margin: 0; }
 }
 
 /* course card */
+.group-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; align-items: start; }
+@media (min-width: 900px) { .group-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; } }
 .course-card { border-left: 3px solid var(--surface-3); }
 .course-head { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; min-height: 34px; }
 .course-name { font: 600 15.5px/1.3 var(--font-display); flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -2337,7 +2339,7 @@ function viewPlanner() {
         Courses give your tasks a color and a home.
         <br><button class="btn btn-primary" data-action="manage-courses" data-cat="study">Add your first course</button></div>`;
     } else {
-      body = `<div class="stack" style="margin-top:12px">${cards.join("")}</div>
+      body = `<div class="group-grid">${cards.join("")}</div>
         ${!normal.length && !deadlines.length ? peekNextHTML(cat) : ""}`;
     }
     if (cat === "work") body += summaryBlockHTML("work", wk, S.weeklySummaries[wk]?.work || null, "Week notes");
