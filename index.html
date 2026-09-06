@@ -254,7 +254,7 @@ h1, h2, h3, p { margin: 0; }
 .summary-block .lbl { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
 .summary-preview { width: 100%; text-align: left; font-size: 13.5px; color: var(--text-2); line-height: 1.5; border-radius: var(--r-sm); padding: 4px 2px; overflow-wrap: anywhere; }
 .summary-preview.empty { color: var(--text-3); font-style: italic; }
-.summary-edit { width: 100%; border: 0; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13.5px; line-height: 1.5; resize: none; display: block; }
+.summary-edit { width: 100%; border: 0; background: var(--surface-2); border-radius: var(--r-sm); padding: 12px 14px; font-size: 14.5px; line-height: 1.55; resize: vertical; display: block; min-height: 150px; }
 .summary-edit:focus { outline: 2px solid var(--ink); outline-offset: 0; }
 
 /* insights */
@@ -2387,9 +2387,11 @@ function summaryBlockHTML(scope, wk, entry, label) {
         <button type="button" data-action="md-wrap" data-wrap="**" aria-label="Bold"><b>B</b></button>
         <button type="button" data-action="md-wrap" data-wrap="*" aria-label="Italic"><i>I</i></button>
         <button type="button" data-action="att-add-summary" ${owner} aria-label="Add image">${IC.image}</button>
+        <span style="flex:1"></span>
+        <button type="button" class="btn btn-primary" style="min-height:32px;padding:0 16px;font-size:13px" data-action="summary-done">Done</button>
       </div>
-      <textarea class="summary-edit" rows="3" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">\n${esc(text)}</textarea>
-      <div class="hint">**bold** · *italic* · paste a screenshot to attach it</div>
+      <textarea class="summary-edit" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">\n${esc(text)}</textarea>
+      <div class="hint">Select text and tap <b>B</b> for bold — it shows styled when you tap Done · paste a screenshot to attach it</div>
       ${attRowHTML(images, owner)}`;
   } else {
     inner = `<button class="summary-preview${text || images.length ? "" : " empty"}" data-action="summary-edit" ${owner}>${text ? mdLite(text) : (images.length ? "<span style='color:var(--text-3)'>Add text…</span>" : "Add a summary for this week…")}</button>
@@ -3068,11 +3070,17 @@ const ACTIONS = {
     renderSheet();
   },
   "summary-edit"(el) {
+    flushSummary(); // switching from another open editor keeps its text
     UI.editingSummary = el.dataset.scope + "|" + el.dataset.week;
     render();
     const ta = document.querySelector(`#view textarea[data-summary="${CSS.escape(el.dataset.scope)}"]`);
-    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    if (ta) {
+      ta.style.height = Math.max(150, ta.scrollHeight + 4) + "px";
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
   },
+  "summary-done"() { closeSummaryEditor(); },
   "cal-mode"(el) {
     if (!["day", "week", "month"].includes(el.dataset.m)) return;
     UI.calMode = el.dataset.m;
@@ -3448,6 +3456,7 @@ document.addEventListener("input", (e) => {
     summaryPending = { scope: el.dataset.summary, week: el.dataset.week, text: el.value };
     clearTimeout(summaryTimer);
     summaryTimer = setTimeout(flushSummary, 600);
+    if (el.scrollHeight > el.clientHeight) el.style.height = (el.scrollHeight + 4) + "px"; // grow with the text
   }
 });
 document.addEventListener("change", (e) => {
@@ -3536,29 +3545,18 @@ document.addEventListener("paste", (e) => {
 document.addEventListener("pointerdown", (e) => {
   if (e.target.closest && e.target.closest('[data-action="md-wrap"], [data-action="att-add-summary"]')) e.preventDefault();
 });
-const MD_TOOLS_SEL = '[data-action="md-wrap"], [data-action="att-add-summary"]';
-function teardownSummaryEditor(ta) {
-  summaryPending = { scope: ta.dataset.summary, week: ta.dataset.week, text: ta.value };
+// The summary editor stays open until the user taps Done (or presses Escape) —
+// losing focus never closes it, so the toolbar, pasting, and stray taps are safe.
+function closeSummaryEditor() {
+  const ta = document.querySelector("#view textarea[data-summary]");
+  if (ta) summaryPending = { scope: ta.dataset.summary, week: ta.dataset.week, text: ta.value };
   flushSummary();
   UI.editingSummary = null;
-  // Defer the re-render until an in-flight tap finishes dispatching its click —
-  // rebuilding the view between mousedown and mouseup would swallow that tap.
-  const finish = () => { clearTimeout(tid); document.removeEventListener("click", finish, true); setTimeout(render, 0); };
-  const tid = setTimeout(finish, 300);
-  document.addEventListener("click", finish, true);
+  render();
 }
-document.addEventListener("focusout", (e) => {
-  const fromTextarea = e.target.matches && e.target.matches("[data-summary]");
-  const fromTools = !fromTextarea && e.target.closest && e.target.closest(".md-tools");
-  if (!fromTextarea && !fromTools) return;
-  const ta = fromTextarea ? e.target : document.querySelector("#view textarea[data-summary]");
-  if (!ta) return;
-  // moving between the textarea and its toolbar keeps the editor open (keyboard access)
-  if (e.relatedTarget && e.relatedTarget.closest && (e.relatedTarget === ta || e.relatedTarget.closest(MD_TOOLS_SEL))) return;
-  teardownSummaryEditor(ta);
-});
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && UI.sheet) { closeSheet(); return; }
+  if (e.key === "Escape" && UI.editingSummary) { closeSummaryEditor(); return; }
   if (e.key === "Tab" && UI.sheet) {
     const root = document.getElementById("sheet-root");
     const f = [...root.querySelectorAll("button, input, textarea, select")].filter(el => !el.disabled && el.offsetParent !== null);
