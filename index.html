@@ -307,6 +307,8 @@ h1, h2, h3, p { margin: 0; }
   .cal-pill-more { font-size: 10.5px; color: var(--text-3); padding: 0 7px; text-align: left; }
 }
 .cal-empty-note { text-align: center; font-size: 12.5px; color: var(--text-3); margin-top: 14px; }
+.cw-head { font: 600 14px/1.2 var(--font-display); display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 8px; margin-left: -8px; border-radius: var(--r-sm); }
+.cw-head:hover { background: var(--surface-2); }
 
 /* habits */
 .habit-card .hd { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
@@ -1018,7 +1020,7 @@ function loadUiPrefs() {
   try { return JSON.parse(localStorage.getItem("planner.uiprefs")) || {}; } catch { return {}; }
 }
 function saveUiPrefs() {
-  try { localStorage.setItem("planner.uiprefs", JSON.stringify({ plannerTab: UI.plannerTab, insightsOpen: UI.insightsOpen })); } catch {}
+  try { localStorage.setItem("planner.uiprefs", JSON.stringify({ plannerTab: UI.plannerTab, insightsOpen: UI.insightsOpen, calMode: UI.calMode })); } catch {}
 }
 /* ============================================================
    sync — modes, debounced single-flight save, stash, boot
@@ -1599,6 +1601,7 @@ async function boot() {
   const prefs = loadUiPrefs();
   UI.plannerTab = CATS.includes(prefs.plannerTab) ? prefs.plannerTab : "study";
   UI.insightsOpen = (prefs.insightsOpen && typeof prefs.insightsOpen === "object" && !Array.isArray(prefs.insightsOpen)) ? prefs.insightsOpen : {};
+  UI.calMode = ["day", "week", "month"].includes(prefs.calMode) ? prefs.calMode : "month";
   parseHash();
   // 1. seed (may carry real data after an html-fallback publish)
   const seedEl = document.getElementById("seed-data");
@@ -1718,6 +1721,7 @@ document.addEventListener("visibilitychange", () => {
 const UI = {
   view: "home", plannerTab: "study", weekKey: currentWeekKey(),
   calYear: new Date().getFullYear(), calMonth0: new Date().getMonth(),
+  calMode: "month", calDay: null,
   selectedDay: null, sheet: null, insightsOpen: {}, homeAnytimeOpen: false,
   overdueOpen: false, expandedHabit: null, editingSummary: null,
   bootDone: false, pendingDrafts: null, archivedHabitsOpen: false,
@@ -2232,6 +2236,63 @@ function summaryBlockHTML(scope, wk, entry, label) {
 }
 
 function viewCalendar() {
+  const seg = `<div class="seg" style="max-width:340px;margin:0 auto 10px">${["day", "week", "month"].map(m =>
+    `<button data-action="cal-mode" data-m="${m}" aria-current="${UI.calMode === m}">${m === "day" ? "Day" : m === "week" ? "Week" : "Month"}</button>`).join("")}</div>`;
+  if (UI.calMode === "day") return seg + calDayHTML();
+  if (UI.calMode === "week") return seg + calWeekHTML();
+  return seg + calMonthHTML();
+}
+function calDayHTML() {
+  const dk = UI.calDay || todayKey();
+  const d = parseDateKey(dk);
+  const isToday = dk === todayKey();
+  const agenda = timedAgenda(dk);
+  const untimed = tasksOnDate(dk).filter(t => !t.dueTime);
+  const wk = weekKeyOf(d);
+  return `<div class="cal-head">
+      <button class="icon-btn" data-action="cal-nav" data-dir="-1" aria-label="Previous day">${IC.left}</button>
+      <span class="cal-title">${DAYS[isoDow(d)]} ${d.getDate()} ${MON3[d.getMonth()]}<span style="color:var(--text-3);font:500 12px var(--font-ui)"> · Week ${parseWeekKey(wk).week}</span></span>
+      ${isToday ? "" : `<button class="today-btn" data-action="cal-today">Today</button>`}
+      <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Next day">${IC.right}</button>
+    </div>
+    ${agenda.length ? `<div class="card"><div class="rows">${agenda.map(agendaRowHTML).join("")}</div></div>` : ""}
+    ${untimed.length ? `<div class="section-label">Anytime</div><div class="card"><div class="rows">${untimed.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div></div>` : ""}
+    ${!agenda.length && !untimed.length ? `<div class="empty" style="padding:24px">Nothing planned on this day.</div>` : ""}
+    <div style="text-align:center;margin-top:14px">
+      <button class="btn btn-ghost" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wk)}" data-date="${esc(dk)}">${IC.plus}&nbsp;Add task on this day</button>
+    </div>`;
+}
+function calWeekHTML() {
+  const wkKey = UI.weekKey;
+  const isNow = wkKey === currentWeekKey();
+  const w = parseWeekKey(wkKey);
+  let out = `<div class="cal-head">
+      <button class="icon-btn" data-action="cal-nav" data-dir="-1" aria-label="Previous week">${IC.left}</button>
+      <span class="cal-title">Week ${w.week}<span style="color:var(--text-3);font:500 12px var(--font-ui)"> · ${weekRangeLabel(wkKey)}${w.year !== isoWeekOf(new Date()).year ? " · " + w.year : ""}</span></span>
+      ${isNow ? "" : `<button class="today-btn" data-action="cal-today">Today</button>`}
+      <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Next week">${IC.right}</button>
+    </div><div class="stack">`;
+  for (const d of weekDates(wkKey)) {
+    const dk = dateKeyOf(d);
+    const isToday = dk === todayKey();
+    const agenda = timedAgenda(dk);
+    const untimed = tasksOnDate(dk).filter(t => !t.dueTime);
+    out += `<div class="card"${isToday ? ' style="outline:2px solid var(--ink);outline-offset:-1px"' : ""}>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="cw-head" data-action="cal-open-day" data-date="${dk}">${DAY3[isoDow(d)]} <b>${d.getDate()}</b>${isToday ? " · today" : ""}</button>
+        <span style="flex:1"></span>
+        <button class="icon-btn" style="width:32px;height:32px" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wkKey)}" data-date="${dk}" aria-label="Add task on ${fmtDateShort(dk)}">${IC.plus}</button>
+      </div>
+      ${agenda.length ? `<div class="rows">${agenda.map(agendaRowHTML).join("")}</div>` : ""}
+      ${untimed.length ? `<div class="rows">${untimed.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : ""}
+    </div>`;
+  }
+  out += `</div>`;
+  const anytime = tasksForWeek(wkKey).filter(t => !t.dueDate);
+  if (anytime.length) out += `<div class="section-label">Anytime this week</div><div class="card"><div class="rows">${sortedRows(anytime)}</div></div>`;
+  return out;
+}
+function calMonthHTML() {
   const y = UI.calYear, m = UI.calMonth0;
   const weeks = calendarMonth(y, m);
   const anyItems = weeks.some(w => w.days.some(d => d.items.length || eventsOn(d.dateKey).length));
@@ -2758,12 +2819,33 @@ const ACTIONS = {
     const ta = document.querySelector(`#view textarea[data-summary="${CSS.escape(el.dataset.scope)}"]`);
     if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   },
-  "cal-nav"(el) {
-    let m = UI.calMonth0 + +el.dataset.dir, y = UI.calYear;
-    if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
-    UI.calMonth0 = m; UI.calYear = y; render();
+  "cal-mode"(el) {
+    if (!["day", "week", "month"].includes(el.dataset.m)) return;
+    UI.calMode = el.dataset.m;
+    if (UI.calMode === "day" && !UI.calDay) UI.calDay = todayKey();
+    saveUiPrefs(); render();
   },
-  "cal-today"() { const n = new Date(); UI.calYear = n.getFullYear(); UI.calMonth0 = n.getMonth(); render(); },
+  "cal-open-day"(el) {
+    UI.calDay = el.dataset.date; UI.calMode = "day";
+    saveUiPrefs(); render();
+  },
+  "cal-nav"(el) {
+    const dir = +el.dataset.dir;
+    if (UI.calMode === "day") { UI.calDay = addDaysKey(UI.calDay || todayKey(), dir); }
+    else if (UI.calMode === "week") { UI.weekKey = addWeeks(UI.weekKey, dir); }
+    else {
+      let m = UI.calMonth0 + dir, y = UI.calYear;
+      if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
+      UI.calMonth0 = m; UI.calYear = y;
+    }
+    render();
+  },
+  "cal-today"() {
+    if (UI.calMode === "day") UI.calDay = todayKey();
+    else if (UI.calMode === "week") UI.weekKey = currentWeekKey();
+    else { const n = new Date(); UI.calYear = n.getFullYear(); UI.calMonth0 = n.getMonth(); }
+    render();
+  },
   "cal-day"(el) { openSheet("day", { dateKey: el.dataset.date }); },
   "cal-week-jump"(el) { UI.weekKey = el.dataset.week; navTo("planner", UI.plannerTab); },
   "habit-chip"(el) {
