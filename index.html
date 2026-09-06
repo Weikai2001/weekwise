@@ -309,6 +309,24 @@ h1, h2, h3, p { margin: 0; }
 .cal-empty-note { text-align: center; font-size: 12.5px; color: var(--text-3); margin-top: 14px; }
 .cw-head { font: 600 14px/1.2 var(--font-display); display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 8px; margin-left: -8px; border-radius: var(--r-sm); }
 .cw-head:hover { background: var(--surface-2); }
+.cw-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: stretch; }
+.cw-col {
+  background: var(--surface); border: 1px solid var(--card-border); box-shadow: var(--shadow);
+  border-radius: 8px; padding: 6px; min-height: 240px;
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.cw-col.today { outline: 2px solid var(--ink); outline-offset: -1px; }
+.cw-col.drop-target { outline: 2px dashed var(--ink); outline-offset: -2px; }
+.cw-col .cal-pill { display: block; width: 100%; }
+.cw-col-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 30px; padding: 0 2px 4px; border-radius: 6px; }
+.cw-col-head:hover { background: var(--surface-2); }
+.cw-dow { font-size: 10.5px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.cal-num.now { background: var(--ink); color: var(--on-ink); }
+.cw-add { margin-top: auto; min-height: 30px; border-radius: 6px; color: var(--text-3); display: inline-flex; align-items: center; justify-content: center; }
+.cw-add:hover { background: var(--surface-2); color: var(--text-2); }
+.cw-stack { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 899px) { .cw-grid { display: none; } }
+@media (min-width: 900px) { .cw-stack { display: none; } }
 
 /* habits */
 .habit-card .hd { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
@@ -2266,18 +2284,31 @@ function calWeekHTML() {
   const wkKey = UI.weekKey;
   const isNow = wkKey === currentWeekKey();
   const w = parseWeekKey(wkKey);
-  let out = `<div class="cal-head">
+  const head = `<div class="cal-head">
       <button class="icon-btn" data-action="cal-nav" data-dir="-1" aria-label="Previous week">${IC.left}</button>
       <span class="cal-title">Week ${w.week}<span style="color:var(--text-3);font:500 12px var(--font-ui)"> · ${weekRangeLabel(wkKey)}${w.year !== isoWeekOf(new Date()).year ? " · " + w.year : ""}</span></span>
       ${isNow ? "" : `<button class="today-btn" data-action="cal-today">Today</button>`}
       <button class="icon-btn" data-action="cal-nav" data-dir="1" aria-label="Next week">${IC.right}</button>
-    </div><div class="stack">`;
-  for (const d of weekDates(wkKey)) {
+    </div>`;
+  const days = weekDates(wkKey).map(d => {
     const dk = dateKeyOf(d);
-    const isToday = dk === todayKey();
-    const agenda = timedAgenda(dk);
-    const untimed = tasksOnDate(dk).filter(t => !t.dueTime);
-    out += `<div class="card"${isToday ? ' style="outline:2px solid var(--ink);outline-offset:-1px"' : ""}>
+    return { d, dk, isToday: dk === todayKey(), agenda: timedAgenda(dk), untimed: tasksOnDate(dk).filter(t => !t.dueTime) };
+  });
+  const taskPill = (t) => `<button class="cal-pill${t.status === "done" ? " done" : ""}" data-task="${esc(t.id)}" data-action="edit-task" data-id="${esc(t.id)}" style="background:${catSoft(t.category)};text-align:left">${t.dueTime ? esc(t.dueTime) + " " : ""}${t.isDeadline ? "◆ " : ""}${esc(t.title)}</button>`;
+  const evPill = (e) => `<span class="cal-pill cal-pill-ev" style="border-left:3px solid ${evColor(e)}">${e.allDay ? "" : esc(evTime(e).split("–")[0]) + " "}${esc(e.title)}</span>`;
+  // 7-column board (≥900px), like a tall month row
+  const grid = `<div class="cw-grid">${days.map(({ d, dk, isToday, agenda, untimed }) => `
+    <div class="cw-col${isToday ? " today" : ""}" data-date="${dk}">
+      <button class="cw-col-head" data-action="cal-open-day" data-date="${dk}">
+        <span class="cw-dow">${DAY3[isoDow(d)]}</span><span class="cal-num${isToday ? " now" : ""}">${d.getDate()}</span>
+      </button>
+      ${agenda.map(it => it.kind === "ev" ? evPill(it.e) : taskPill(it.t)).join("")}
+      ${untimed.map(taskPill).join("")}
+      <button class="cw-add" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wkKey)}" data-date="${dk}" aria-label="Add task on ${fmtDateShort(dk)}">${IC.plus}</button>
+    </div>`).join("")}</div>`;
+  // stacked day cards (<900px)
+  const stack = `<div class="cw-stack">${days.map(({ d, dk, isToday, agenda, untimed }) => `
+    <div class="card"${isToday ? ' style="outline:2px solid var(--ink);outline-offset:-1px"' : ""}>
       <div style="display:flex;align-items:center;gap:8px">
         <button class="cw-head" data-action="cal-open-day" data-date="${dk}">${DAY3[isoDow(d)]} <b>${d.getDate()}</b>${isToday ? " · today" : ""}</button>
         <span style="flex:1"></span>
@@ -2285,12 +2316,10 @@ function calWeekHTML() {
       </div>
       ${agenda.length ? `<div class="rows">${agenda.map(agendaRowHTML).join("")}</div>` : ""}
       ${untimed.length ? `<div class="rows">${untimed.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : ""}
-    </div>`;
-  }
-  out += `</div>`;
+    </div>`).join("")}</div>`;
   const anytime = tasksForWeek(wkKey).filter(t => !t.dueDate);
-  if (anytime.length) out += `<div class="section-label">Anytime this week</div><div class="card"><div class="rows">${sortedRows(anytime)}</div></div>`;
-  return out;
+  return head + grid + stack +
+    (anytime.length ? `<div class="section-label">Anytime this week</div><div class="card"><div class="rows">${sortedRows(anytime)}</div></div>` : "");
 }
 function calMonthHTML() {
   const y = UI.calYear, m = UI.calMonth0;
@@ -3063,7 +3092,7 @@ document.addEventListener("pointermove", (e) => {
   dragState.ghost.style.left = (e.clientX + 12) + "px";
   dragState.ghost.style.top = (e.clientY - 14) + "px";
   const under = document.elementFromPoint(e.clientX, e.clientY);
-  const cell = under && under.closest ? under.closest(".cal-cell") : null;
+  const cell = under && under.closest ? under.closest(".cal-cell, .cw-col") : null;
   if (dragState.overCell && dragState.overCell !== cell) dragState.overCell.classList.remove("drop-target");
   dragState.overCell = cell;
   if (cell) cell.classList.add("drop-target");
