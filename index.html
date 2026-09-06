@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"></head><body>
-<title>WeekWise</title>
+<title>MasterChen</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
 <style>
@@ -461,6 +461,17 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 /* external calendar events */
 .ev-time { font-size: 11.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 78px; }
 
+/* calendar drag & drop */
+.cal-pill[data-task] { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.cal-cell.drop-target { outline: 2px dashed var(--ink); outline-offset: -2px; }
+.drag-ghost {
+  position: fixed; z-index: 300; pointer-events: none;
+  padding: 4px 10px; border-radius: 7px; font-size: 11.5px; font-weight: 500;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .28);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* pinned groups */
 .pin-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--r-sm); color: var(--text-3); flex-shrink: 0; }
 .pin-btn:hover { background: var(--surface-2); }
@@ -623,6 +634,7 @@ function normalize(d) {
     if (t.dueDate && isNaN(parseDateKey(t.dueDate).getTime())) t.dueDate = null;
     if (t.dueDate) t.weekKey = weekKeyOf(parseDateKey(t.dueDate));
     else if (!parseWeekKey(t.weekKey || "")) t.weekKey = currentWeekKey();
+    if (!(t.dueDate && /^([01]\d|2[0-3]):[0-5]\d$/.test(t.dueTime || ""))) delete t.dueTime;
     t.isDeadline = !!t.isDeadline;
     t.status = t.status === "done" ? "done" : "open";
     t.doneAt = t.status === "done" ? (t.doneAt || nowIso()) : null;
@@ -1167,7 +1179,7 @@ async function ghRefreshIfIdle() {
     loadEvents();
   } catch {} finally { ghRefreshInFlight = false; }
 }
-window.addEventListener("focus", () => ghRefreshIfIdle());
+window.addEventListener("focus", () => { ghRefreshIfIdle(); if (typeof checkAppUpdate === "function") checkAppUpdate(); });
 
 /* ---- image attachments (stored beside the data file, synced like it) ---- */
 const attUrlCache = new Map();
@@ -1562,6 +1574,8 @@ function updateChrome() {
   chip.className = cls; chip.title = title;
   chip.querySelector(".chip-text").textContent = text;
   let b = "";
+  const updBanner = (typeof updateAvailable !== "undefined" && updateAvailable && !futureVersion)
+    ? '<div class="banner banner-info">A new version is ready.<span class="spacer"></span><button data-action="reload-app">Update now</button></div>' : "";
   if (futureVersion) b = '<div class="banner banner-warn">This page is running an older version of the app — showing read-only.<span class="spacer"></span><button data-action="reload-app">Reload to update</button></div>';
   else if (mode === "load-error") b = '<div class="banner banner-warn">Couldn’t load your data — retrying. Editing is paused so nothing gets overwritten.<span class="spacer"></span><button data-action="reload-app">Reload</button></div>';
   else if (mode === "readonly") b = '<div class="banner banner-info">View-only — you don’t have edit access on this device.</div>';
@@ -1570,7 +1584,7 @@ function updateChrome() {
       ? '<div class="banner banner-warn">Sync code invalid or expired — changes stay in this browser until it’s updated.<span class="spacer"></span><button data-action="open-sync">Update code</button></div>'
       : '<div class="banner banner-info">Local only — changes stay in this browser.<span class="spacer"></span><button data-action="open-sync">Connect sync</button></div>';
   }
-  banner.innerHTML = b;
+  banner.innerHTML = updBanner + b;
 }
 
 /* ---- boot ---- */
@@ -1657,6 +1671,7 @@ async function boot() {
     if (ps.kind === "sync") refreshFeedsUI();
   }
   loadEvents();
+  checkAppUpdate(); // records the baseline for the new-version banner
 }
 async function retryDataLoad() {
   for (let i = 0; i < 3 && mode === "load-error"; i++) {
@@ -1695,7 +1710,7 @@ async function retryDataLoad() {
 window.addEventListener("pagehide", () => { flushSummary(); if (dirty && !conflictLock) { stashNow(); saveNow(); } });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") { flushSummary(); if (dirty && !conflictLock) { stashNow(); saveNow(); } }
-  else if (document.visibilityState === "visible") ghRefreshIfIdle();
+  else if (document.visibilityState === "visible") { ghRefreshIfIdle(); if (typeof checkAppUpdate === "function") checkAppUpdate(); }
 });
 /* ============================================================
    components — helpers, icons, rows, charts, sheet, toast, shell
@@ -1743,6 +1758,36 @@ function evColor(e) {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return swColor(Math.abs(h) % 12);
 }
+/* a day's timed agenda: calendar events + tasks with a time slot, chronological */
+function timedAgenda(dateKey) {
+  const evs = eventsOn(dateKey).map(e => {
+    let key = "";
+    if (!e.allDay) { const d = new Date(e.start); if (!isNaN(d)) key = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+    return { kind: "ev", key, e };
+  });
+  const tasks = tasksOnDate(dateKey).filter(t => t.dueTime).map(t => ({ kind: "task", key: t.dueTime, t }));
+  return [...evs, ...tasks].sort((a, b) => a.key.localeCompare(b.key));
+}
+function agendaRowHTML(item) {
+  if (item.kind === "ev") {
+    const e = item.e;
+    return `<div class="row" style="min-height:44px">
+      <span class="cat-dot" style="background:${evColor(e)}"></span>
+      <span class="ev-time">${esc(evTime(e))}</span>
+      <span class="row-main"><span class="row-title">${esc(e.title)}</span>
+      <span class="row-meta">${esc(e.location ? e.location + " · " : "")}${esc(e.feed || "")}</span></span>
+    </div>`;
+  }
+  const t = item.t;
+  return `<div class="row${t.status === "done" ? " done" : ""}" style="min-height:44px">
+    ${checkBtn(t)}
+    <span class="ev-time">${esc(t.dueTime)}</span>
+    <button class="row-main" data-action="edit-task" data-id="${esc(t.id)}">
+      <span class="row-title">${t.isDeadline ? '<span class="deadline-mark" aria-label="deadline">◆</span> ' : ""}${esc(t.title)}</span>
+      <span class="row-meta"><span class="cat-dot" style="background:${taskColor(t)}"></span><span>${esc(taskContextLabel(t))}</span></span>
+    </button>
+  </div>`;
+}
 
 /* markdown-lite: **bold** and *italic* on top of escaped text */
 function mdLite(text) {
@@ -1776,7 +1821,9 @@ function taskRowHTML(t, opts = {}) {
   let chip = "";
   if (t.dueDate && !opts.hideDate) {
     const overdue = !done && t.dueDate < todayKey();
-    chip = `<span class="date-chip${overdue ? " overdue" : ""}">${esc(opts.longDate ? fmtDateShort(t.dueDate) : fmtDayNum(t.dueDate))}${overdue ? " · late" : ""}</span>`;
+    chip = `<span class="date-chip${overdue ? " overdue" : ""}">${esc(opts.longDate ? fmtDateShort(t.dueDate) : fmtDayNum(t.dueDate))}${t.dueTime ? " · " + esc(t.dueTime) : ""}${overdue ? " · late" : ""}</span>`;
+  } else if (t.dueTime && opts.hideDate) {
+    chip = `<span class="date-chip">${esc(t.dueTime)}</span>`;
   }
   return `<div class="row${done ? " done" : ""}">
     ${checkBtn(t)}
@@ -1942,7 +1989,7 @@ function renderShell() {
   document.getElementById("tabbar").innerHTML = NAV.map(n =>
     `<button data-action="nav" data-view="${n.view}" aria-current="${UI.view === n.view}" aria-label="${n.label}">${IC[n.icon]}<span>${n.label}</span></button>`).join("");
   document.getElementById("sidebar").innerHTML = `
-    <div class="wordmark">WeekWise</div>
+    <div class="wordmark">MasterChen</div>
     <button class="nav-item" data-action="nav" data-view="home" aria-current="${UI.view === "home"}">${IC.home}Home</button>
     <div class="nav-section">Planner</div>
     ${CATS.map(c => `<button class="nav-item" data-action="nav" data-view="planner" data-tab="${c}" aria-current="${UI.view === "planner" && UI.plannerTab === c}"><span class="nav-dot" style="background:${catColor(c)}"></span>${CAT_LABEL[c]}</button>`).join("")}
@@ -2026,7 +2073,8 @@ function viewHome() {
   const now = new Date();
   const counts = weekCounts(cw);
   const overdue = overdueTasks();
-  const todays = S.tasks.filter(t => t.dueDate === today).sort(byOrder);
+  const todays = S.tasks.filter(t => t.dueDate === today)
+    .sort((a, b) => String(a.dueTime || "99").localeCompare(String(b.dueTime || "99")) || byOrder(a, b));
   const anytime = tasksForWeek(cw).filter(t => !t.dueDate && t.status === "open");
   const dailyToday = S.habits.filter(h => !h.archived && h.kind === "daily" && habitActiveOn(h, now) && h.startDate <= today).sort(byOrder);
   const deadlines = upcomingDeadlines(5);
@@ -2052,14 +2100,9 @@ function viewHome() {
   <div class="home-col">
     ${overdueBannerHTML(overdue, "all")}
     ${(() => {
-      const evs = eventsOn(today);
-      return evs.length ? `<div class="section-label">Today’s schedule</div>
-      <div class="card"><div class="rows">${evs.map(e => `<div class="row" style="min-height:44px">
-        <span class="cat-dot" style="background:${evColor(e)}"></span>
-        <span class="ev-time">${esc(evTime(e))}</span>
-        <span class="row-main"><span class="row-title">${esc(e.title)}</span>
-        <span class="row-meta">${esc(e.location ? e.location + " · " : "")}${esc(e.feed || "")}</span></span>
-      </div>`).join("")}</div></div>` : "";
+      const agenda = timedAgenda(today);
+      return agenda.length ? `<div class="section-label">Today’s schedule</div>
+      <div class="card"><div class="rows">${agenda.map(agendaRowHTML).join("")}</div></div>` : "";
     })()}
     <div class="section-label">Today</div>
     <div class="card">${todays.length
@@ -2204,8 +2247,9 @@ function viewCalendar() {
         `<span class="cal-dot${t.isDeadline ? " diamond" : ""}${t.status === "done" ? " done" : ""}" style="background:${taskColor(t)}"></span>`).join("") +
         (d.items.length > 4 ? `<span class="cal-more">+</span>` : "") +
         (evs.length ? `<span class="cal-dot ev" style="border-color:${evColor(evs[0])}"></span>` : "");
-      const taskPills = d.items.slice(0, 3).map(t =>
-        `<span class="cal-pill${t.status === "done" ? " done" : ""}" style="background:${catSoft(t.category)}">${t.isDeadline ? "◆ " : ""}${esc(t.title)}</span>`).join("") +
+      const sortedItems = [...d.items].sort((a, b) => String(a.dueTime || "99").localeCompare(String(b.dueTime || "99")));
+      const taskPills = sortedItems.slice(0, 3).map(t =>
+        `<span class="cal-pill${t.status === "done" ? " done" : ""}" data-task="${esc(t.id)}" style="background:${catSoft(t.category)}">${t.dueTime ? esc(t.dueTime) + " " : ""}${t.isDeadline ? "◆ " : ""}${esc(t.title)}</span>`).join("") +
         (d.items.length > 3 ? `<span class="cal-pill-more">+${d.items.length - 3} more</span>` : "");
       const evSlots = Math.max(0, 4 - Math.min(d.items.length, 3) - (d.items.length > 3 ? 1 : 0));
       const evPills = evs.slice(0, evSlots).map(e =>
@@ -2353,6 +2397,11 @@ const SHEETS = {
       <button class="chip" data-action="ts-day" data-date="" aria-pressed="${!d.dueDate}">No day</button>
     </div>
     <input class="text-input" type="date" style="margin-top:9px" value="${esc(d.dueDate || "")}" data-ts-date aria-label="Or pick a date">
+    ${d.dueDate ? `<div style="display:flex;align-items:center;gap:10px;margin-top:9px">
+      <label style="font-size:12px;font-weight:600;color:var(--text-2)">Time</label>
+      <input class="text-input" type="time" style="flex:1" value="${esc(d.dueTime || "")}" data-ts-time aria-label="Time (optional)">
+      ${d.dueTime ? `<button type="button" class="btn-quiet" data-action="ts-clear-time">Clear</button>` : ""}
+    </div>` : ""}
     ${movesTo ? `<div class="hint">This date is in week ${parseWeekKey(movesTo).week} — the task will move there.</div>` : ""}
     </div>`}
     <div class="switch-row"><span><span class="lbl">Deadline</span><br><span class="sub">Marked with ◆ and tracked on Home</span></span>
@@ -2424,16 +2473,12 @@ const SHEETS = {
   },
   day(p) {
     const items = tasksOnDate(p.dateKey);
-    const evs = eventsOn(p.dateKey);
+    const agenda = timedAgenda(p.dateKey);
+    const untimed = items.filter(t => !t.dueTime);
     const wk = weekKeyOf(parseDateKey(p.dateKey));
     return `<h2>${fmtDateShort(p.dateKey)} · Week ${parseWeekKey(wk).week}</h2>
-    ${evs.length ? `<div class="rows" style="margin-bottom:${items.length ? "10px" : "0"}">${evs.map(e => `<div class="row" style="min-height:44px">
-      <span class="cat-dot" style="background:${evColor(e)}"></span>
-      <span class="ev-time">${esc(evTime(e))}</span>
-      <span class="row-main"><span class="row-title">${esc(e.title)}</span>
-      <span class="row-meta">${esc(e.location ? e.location + " · " : "")}${esc(e.feed || "")}</span></span>
-    </div>`).join("")}</div>` : ""}
-    ${items.length ? `<div class="rows">${items.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : (evs.length ? "" : `<div class="empty" style="padding:10px">Nothing planned on this day.</div>`)}
+    ${agenda.length ? `<div class="rows" style="margin-bottom:${untimed.length ? "10px" : "0"}">${agenda.map(agendaRowHTML).join("")}</div>` : ""}
+    ${untimed.length ? `<div class="rows">${untimed.map(t => taskRowHTML(t, { hideDate: true })).join("")}</div>` : (agenda.length ? "" : `<div class="empty" style="padding:10px">Nothing planned on this day.</div>`)}
     <div class="sheet-footer">
       <button class="btn btn-ghost" data-action="open-task-sheet" data-cat="${esc(UI.plannerTab)}" data-week="${esc(wk)}" data-date="${esc(p.dateKey)}">${IC.plus}&nbsp;Add task on this day</button>
     </div>`;
@@ -2477,7 +2522,7 @@ const SHEETS = {
       <p class="hint">Events refresh automatically a few times a day. In Outlook: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link. In TU Delft MyTimetable: Connect calendar → iCal.</p>
     </div>` : ""}
     <div class="field" style="margin-top:20px"><label>Restore from a backup</label>
-      <textarea class="text-input" rows="3" placeholder="Paste a WeekWise backup (JSON) here…" data-draft-field="importJson"></textarea>
+      <textarea class="text-input" rows="3" placeholder="Paste a MasterChen backup (JSON) here…" data-draft-field="importJson"></textarea>
       <div class="sheet-footer" style="margin-top:8px">
         <button class="btn btn-ghost" data-action="open-export">Show my backup</button>
         <button class="btn btn-ghost" data-action="sync-import">${p.confirmImport ? "Replace current data?" : "Import"}</button>
@@ -2538,7 +2583,7 @@ const ACTIONS = {
     const t = findById(S.tasks, el.dataset.id); if (!t) return;
     openSheet("task", { id: t.id, templateId: t.templateId, lockCategory: false, draft: {
       title: t.title, category: t.category, courseId: t.courseId, weekKey: t.weekKey,
-      dueDate: t.dueDate, isDeadline: t.isDeadline, notes: t.notes, repeat: false,
+      dueDate: t.dueDate, dueTime: t.dueTime || null, isDeadline: t.isDeadline, notes: t.notes, repeat: false,
       images: [...(t.images || [])],
     }});
   },
@@ -2552,6 +2597,7 @@ const ACTIONS = {
   "ts-course"(el) { syncDraftInputs(); UI.sheet.params.draft.courseId = el.dataset.id || null; renderSheet(); },
   "ts-day"(el) { syncDraftInputs(); UI.sheet.params.draft.dueDate = el.dataset.date || null; renderSheet(); },
   "ts-deadline"() { syncDraftInputs(); const d = UI.sheet.params.draft; d.isDeadline = !d.isDeadline; renderSheet(); },
+  "ts-clear-time"() { syncDraftInputs(); UI.sheet.params.draft.dueTime = null; renderSheet(); },
   "ts-repeat"() { syncDraftInputs(); const d = UI.sheet.params.draft; d.repeat = !d.repeat; if (d.repeat) d.dueDate = null; renderSheet(); },
   "ts-stop-repeat"(el) {
     dispatch({ t: "template.patch", id: el.dataset.id, patch: { archived: true } }, { silent: true });
@@ -2570,7 +2616,8 @@ const ACTIONS = {
       const weekKey = d.dueDate ? weekKeyOf(parseDateKey(d.dueDate)) : d.weekKey;
       dispatch({ t: "task.patch", id: p.id, patch: {
         title: d.title.trim(), category: d.category, courseId,
-        dueDate: d.dueDate, isDeadline: d.isDeadline, notes: d.notes, weekKey, images,
+        dueDate: d.dueDate, dueTime: d.dueDate && d.dueTime ? d.dueTime : null,
+        isDeadline: d.isDeadline, notes: d.notes, weekKey, images,
       }}, { silent: true });
       for (const id of removed) {
         const meta = S.attachments[id];
@@ -2595,6 +2642,7 @@ const ACTIONS = {
         notes: d.notes, templateId: null, sortOrder: nextSortOrder(S.tasks),
         createdAt: nowIso(), updatedAt: nowIso(),
       };
+      if (d.dueDate && d.dueTime) task.dueTime = d.dueTime;
       if (images) task.images = images;
       dispatch({ t: "task.upsert", task }, { silent: true });
     }
@@ -2890,7 +2938,7 @@ const ACTIONS = {
     syncDraftInputs();
     const p = UI.sheet.params;
     const cand = tryHydrate((p.draft.importJson || "").trim());
-    if (!cand || cand.future) { toast(cand ? "That backup is from a newer app version." : "That doesn’t look like a WeekWise backup."); return; }
+    if (!cand || cand.future) { toast(cand ? "That backup is from a newer app version." : "That doesn’t look like a MasterChen backup."); return; }
     if (!p.confirmImport) { p.confirmImport = true; renderSheet(); refreshFeedsUI(); return; }
     S = cand.data; futureVersion = false; normalize(S); rev++;
     opLog = []; dirty = true; firstDirtyAt = Date.now(); saveState = "dirty"; scheduleSave(300);
@@ -2902,8 +2950,80 @@ const ACTIONS = {
   "export-select"() { const t = document.getElementById("export-json"); if (t) { t.focus(); t.select(); } },
 };
 
+/* ---- drag a task pill to another day on the month calendar ---- */
+let dragState = null, suppressNextClick = false;
+function cancelDrag() {
+  if (!dragState) return;
+  if (dragState.ghost) dragState.ghost.remove();
+  if (dragState.overCell) dragState.overCell.classList.remove("drop-target");
+  document.body.style.userSelect = "";
+  dragState = null;
+}
+document.addEventListener("pointerdown", (e) => {
+  const pill = e.target.closest && e.target.closest(".cal-pill[data-task]");
+  if (!pill || (e.pointerType === "mouse" && e.button !== 0)) return;
+  if (mode === "readonly" || mode === "load-error" || futureVersion) return;
+  dragState = { id: pill.dataset.task, startX: e.clientX, startY: e.clientY, active: false, ghost: null, overCell: null };
+});
+document.addEventListener("pointermove", (e) => {
+  if (!dragState) return;
+  if (!dragState.active) {
+    if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < 7) return;
+    dragState.active = true;
+    const t = findById(S.tasks, dragState.id);
+    const g = document.createElement("div");
+    g.className = "drag-ghost";
+    g.textContent = t ? t.title : "Task";
+    document.body.appendChild(g);
+    dragState.ghost = g;
+    document.body.style.userSelect = "none";
+  }
+  dragState.ghost.style.left = (e.clientX + 12) + "px";
+  dragState.ghost.style.top = (e.clientY - 14) + "px";
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = under && under.closest ? under.closest(".cal-cell") : null;
+  if (dragState.overCell && dragState.overCell !== cell) dragState.overCell.classList.remove("drop-target");
+  dragState.overCell = cell;
+  if (cell) cell.classList.add("drop-target");
+});
+document.addEventListener("pointerup", () => {
+  if (!dragState) return;
+  const st = dragState;
+  if (!st.active) { dragState = null; return; } // plain click/tap: normal flow
+  suppressNextClick = true;
+  setTimeout(() => { suppressNextClick = false; }, 50);
+  const targetDate = st.overCell?.dataset?.date || null;
+  cancelDrag();
+  const t = findById(S.tasks, st.id);
+  if (t && targetDate && targetDate !== t.dueDate) {
+    const prev = { dueDate: t.dueDate, weekKey: t.weekKey };
+    dispatch({ t: "task.patch", id: t.id, patch: { dueDate: targetDate } }); // weekKey follows the date
+    toast(`Moved to ${fmtDateShort(targetDate)}`, { label: "Undo", fn: () => {
+      dispatch({ t: "task.patch", id: t.id, patch: { dueDate: prev.dueDate, weekKey: prev.weekKey } }, { silent: true });
+      render();
+    }});
+  }
+});
+document.addEventListener("pointercancel", cancelDrag);
+
+/* ---- new-version check (a stale cached page was a recurring pain) ---- */
+let appEtag = null, lastUpdateCheck = 0, updateAvailable = false;
+async function checkAppUpdate() {
+  if (updateAvailable || Date.now() - lastUpdateCheck < 600000) return;
+  lastUpdateCheck = Date.now();
+  try {
+    const r = await fetch(location.href.split("#")[0], { method: "HEAD", cache: "no-store" });
+    if (!r.ok) return;
+    const tag = r.headers.get("etag") || r.headers.get("last-modified");
+    if (!tag) return;
+    if (appEtag === null) { appEtag = tag; return; }
+    if (tag !== appEtag) { updateAvailable = true; updateChrome(); }
+  } catch {}
+}
+
 /* delegation */
 document.addEventListener("click", (e) => {
+  if (suppressNextClick) { suppressNextClick = false; e.preventDefault(); e.stopPropagation(); return; }
   const g = e.target.closest("g[data-tip]");
   if (g) {
     const cap = g.closest(".chart-wrap")?.querySelector(".chart-caption");
@@ -2961,6 +3081,11 @@ document.addEventListener("change", (e) => {
   if (el.matches("[data-ts-date]") && UI.sheet?.params?.draft) {
     syncDraftInputs();
     UI.sheet.params.draft.dueDate = el.value || null;
+    if (!el.value) UI.sheet.params.draft.dueTime = null;
+    renderSheet();
+  } else if (el.matches("[data-ts-time]") && UI.sheet?.params?.draft) {
+    syncDraftInputs();
+    UI.sheet.params.draft.dueTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(el.value) ? el.value : null;
     renderSheet();
   } else if (el.matches("[data-course-name]")) {
     const name = el.value.trim();
