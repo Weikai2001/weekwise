@@ -515,6 +515,23 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .focus-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 42px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .focus-label { font-size: 14px; font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
 .focus-stat { font: 700 21px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.focus-msg { font-size: 13px; color: var(--text-2); min-height: 18px; margin-top: 4px; }
+.focus-ringwrap.live .focus-ring { filter: drop-shadow(0 0 14px rgb(99 102 241 / .32)); }
+@media (prefers-reduced-motion: no-preference) {
+  .focus-ringwrap.live { animation: breathe 4s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.015); } }
+  .focus-ringwrap.live::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px dotted rgb(99 102 241 / .3); animation: orbit 16s linear infinite; }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+}
+.quest-card.done { opacity: .85; }
+.quest-ico { font-size: 22px; }
+.badge-shelf { display: flex; flex-wrap: wrap; gap: 10px; }
+.badge { width: 46px; height: 46px; border-radius: 50%; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 21px; border: 1px solid var(--border); }
+.badge.locked { filter: grayscale(1); opacity: .35; }
+.badge:not(.locked) { background: linear-gradient(135deg, var(--cat-study-soft), var(--surface)); border-color: var(--cat-study); box-shadow: 0 2px 8px rgb(99 102 241 / .18); }
+.confetti { position: fixed; inset: 0; z-index: 500; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; top: -14px; width: 8px; height: 13px; border-radius: 2px; animation: confall linear forwards; }
+@keyframes confall { to { transform: translateY(105vh) rotate(540deg); opacity: .65; } }
 #lvl-overlay {
   position: fixed; inset: 0; z-index: 400; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -755,8 +772,11 @@ function normalize(d) {
       sessions: Math.max(0, Math.floor(Number(v.sessions) || 0)),
       xp: Math.max(0, Math.floor(Number(v.xp) || 0)),
     };
+    if (v.quest) cleanFDays[k].quest = 1;
   }
   d.focus.days = cleanFDays;
+  d.focus.badges = (Array.isArray(d.focus.badges) ? d.focus.badges : [])
+    .filter(b => typeof b === "string" && b.length <= 24).slice(0, 64);
   d.focus.recent = (Array.isArray(d.focus.recent) ? d.focus.recent : [])
     .filter(s => s && typeof s === "object" && typeof s.at === "string").slice(0, 30)
     .map(s => ({ at: s.at, minutes: Math.max(0, Math.floor(Number(s.minutes) || 0)),
@@ -943,6 +963,23 @@ function apply(op) {
       f.recent.unshift({ at: typeof op.at === "string" ? op.at : nowIso(), minutes, xp,
         label: typeof op.label === "string" ? op.label.slice(0, 80) : "" });
       if (f.recent.length > 30) f.recent.length = 30;
+      break;
+    }
+    case "focus.badge": {
+      const f = S.focus;
+      f.badges ||= [];
+      if (typeof op.id !== "string" || f.badges.includes(op.id)) return false;
+      f.badges.push(op.id);
+      break;
+    }
+    case "focus.quest": {
+      const f = S.focus;
+      const dk = /^\d{4}-\d{2}-\d{2}$/.test(op.dateKey || "") ? op.dateKey : todayKey();
+      const day = (f.days[dk] ||= { minutes: 0, sessions: 0, xp: 0 });
+      if (day.quest) return false; // already claimed (also guards conflict replays)
+      day.quest = 1;
+      const xp = Math.max(0, Math.floor(Number(op.xp) || 0));
+      f.xp += xp; day.xp += xp;
       break;
     }
     case "xp.add": {
@@ -1780,6 +1817,7 @@ async function boot() {
   const rt = timerState();
   if (rt && !rt.paused && (Number(rt.endsAt) || 0) <= Date.now()) completeFocusTimer(true);
   setInterval(focusTickFn, 500);
+  checkFocusExtras();
 }
 async function retryDataLoad() {
   for (let i = 0; i < 3 && mode === "load-error"; i++) {
@@ -1875,8 +1913,130 @@ function awardXp(amount, opts = {}) {
   const after = levelFromXp(S.focus.xp);
   if (after > before) showLevelUp(after);
   else if (amount > 0 && opts.toast !== false) toast(`+${amount} XP`);
+  checkFocusExtras();
+}
+function focusStreak() {
+  const c = localMidnight(new Date());
+  if (!(S.focus.days[dateKeyOf(c)]?.sessions > 0)) c.setDate(c.getDate() - 1);
+  let streak = 0;
+  while (S.focus.days[dateKeyOf(c)]?.sessions > 0) { streak++; c.setDate(c.getDate() - 1); }
+  return streak;
+}
+function focusStats() {
+  let totalMin = 0, totalSessions = 0;
+  for (const v of Object.values(S.focus.days)) { totalMin += v.minutes; totalSessions += v.sessions; }
+  return { totalMin, totalSessions, streak: focusStreak(), level: levelFromXp(S.focus.xp) };
+}
+function localHourOf(iso) { const d = new Date(iso); return isNaN(d) ? 12 : d.getHours(); }
+const BADGES = [
+  { id: "first", emoji: "🎯", name: "First Focus", desc: "Complete your first session", test: s => s.totalSessions >= 1 },
+  { id: "s10", emoji: "🔟", name: "Ten Deep", desc: "Complete 10 sessions", test: s => s.totalSessions >= 10 },
+  { id: "s50", emoji: "🏅", name: "Half Century", desc: "Complete 50 sessions", test: s => s.totalSessions >= 50 },
+  { id: "h10", emoji: "⏳", name: "10 Hours In", desc: "Focus for 10 hours total", test: s => s.totalMin >= 600 },
+  { id: "h50", emoji: "🧠", name: "Focus Veteran", desc: "Focus for 50 hours total", test: s => s.totalMin >= 3000 },
+  { id: "streak3", emoji: "🔥", name: "On a Roll", desc: "3-day focus streak", test: s => s.streak >= 3 },
+  { id: "streak7", emoji: "⚔️", name: "Week Warrior", desc: "7-day focus streak", test: s => s.streak >= 7 },
+  { id: "early", emoji: "🌅", name: "Early Bird", desc: "Finish a session before 08:00", test: () => S.focus.recent.some(x => localHourOf(x.at) < 8) },
+  { id: "night", emoji: "🦉", name: "Night Owl", desc: "Finish a session after 22:00", test: () => S.focus.recent.some(x => localHourOf(x.at) >= 22) },
+  { id: "marathon", emoji: "🏃", name: "Marathon", desc: "Complete a full 60-minute session", test: () => S.focus.recent.some(x => x.minutes >= 60) },
+  { id: "lvl5", emoji: "🌟", name: "Rising Star", desc: "Reach level 5", test: s => s.level >= 5 },
+  { id: "master", emoji: "👑", name: "MasterChen", desc: "Reach level 10", test: s => s.level >= 10 },
+];
+const QUESTS = [
+  { id: 0, xp: 20, name: "Complete 2 focus sessions", progress: (dk) => [S.focus.days[dk]?.sessions || 0, 2] },
+  { id: 1, xp: 20, name: "Focus for 45 minutes", progress: (dk) => [S.focus.days[dk]?.minutes || 0, 45] },
+  { id: 2, xp: 15, name: "Complete one 30-minute session", progress: (dk) => [S.focus.recent.some(x => x.minutes >= 30 && dateKeyOf(new Date(x.at)) === dk) ? 1 : 0, 1] },
+  { id: 3, xp: 15, name: "Finish 3 tasks today", progress: (dk) => [S.tasks.filter(t => t.doneAt && !isNaN(new Date(t.doneAt)) && dateKeyOf(new Date(t.doneAt)) === dk).length, 3] },
+  { id: 4, xp: 15, name: "Tick all your daily habits", progress: (dk) => {
+    const d = parseDateKey(dk);
+    const active = S.habits.filter(h => !h.archived && h.kind === "daily" && habitActiveOn(h, d) && h.startDate <= dk);
+    if (!active.length) return [0, 1];
+    return [active.filter(h => habitChecked(h, dk)).length, active.length];
+  } },
+];
+function questForDay(dk) {
+  let h = 0;
+  for (let i = 0; i < dk.length; i++) h = (h * 31 + dk.charCodeAt(i)) | 0;
+  return QUESTS[Math.abs(h) % QUESTS.length];
+}
+let extrasBusy = false;
+function checkFocusExtras() {
+  if (extrasBusy || !S || mode === "readonly" || mode === "load-error" || futureVersion) return;
+  extrasBusy = true;
+  let changed = false;
+  try {
+    const dk = todayKey();
+    const q = questForDay(dk);
+    const day = S.focus.days[dk];
+    if (!(day && day.quest)) {
+      const [cur, goal] = q.progress(dk);
+      if (cur >= goal) {
+        const before = levelFromXp(S.focus.xp);
+        const ok = dispatch({ t: "focus.quest", dateKey: dk, xp: q.xp }, { silent: true });
+        if (ok !== false) {
+          changed = true;
+          const after = levelFromXp(S.focus.xp);
+          if (after > before) showLevelUp(after);
+          else toast(`🏆 Daily quest complete — +${q.xp} XP!`);
+        }
+      }
+    }
+    const stats = focusStats();
+    for (const b of BADGES) {
+      if ((S.focus.badges || []).includes(b.id)) continue;
+      let earned = false;
+      try { earned = !!b.test(stats); } catch {}
+      if (earned) {
+        const ok = dispatch({ t: "focus.badge", id: b.id }, { silent: true });
+        if (ok !== false) { changed = true; toast(`${b.emoji} Badge earned: ${b.name}!`); }
+      }
+    }
+  } finally { extrasBusy = false; }
+  if (changed) render();
+}
+function confettiBurst() {
+  if (!window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;
+  const wrap = document.createElement("div");
+  wrap.className = "confetti";
+  let bits = "";
+  for (let i = 0; i < 36; i++) {
+    bits += `<i style="left:${(Math.random() * 100).toFixed(1)}%;background:var(--sw-${i % 12});animation-duration:${(1 + Math.random()).toFixed(2)}s;animation-delay:${(Math.random() * 0.3).toFixed(2)}s;transform:rotate(${Math.floor(Math.random() * 360)}deg)"></i>`;
+  }
+  wrap.innerHTML = bits;
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 2600);
+}
+function focusGreeting() {
+  const h = new Date().getHours();
+  const base = h < 6 ? "Late night grind 🌙" : h < 12 ? "Goedemorgen ☀️" : h < 18 ? "Good afternoon 👋" : "Good evening 🌆";
+  const streak = focusStreak();
+  return streak >= 2 ? `${base} — 🔥 ${streak}-day streak, keep it alive!` : `${base} — ready to focus?`;
+}
+function focusWeekChart() {
+  const days = [];
+  const t = localMidnight(new Date());
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(t.getFullYear(), t.getMonth(), t.getDate() - i);
+    const dk = dateKeyOf(d);
+    days.push({ dk, letter: DAY3[isoDow(d)][0], min: S.focus.days[dk]?.minutes || 0, isToday: i === 0 });
+  }
+  const max = niceMax(Math.max(...days.map(x => x.min), 30));
+  const W = 320, H = 96, bottom = 16, top = 8;
+  const plotH = H - top - bottom, pitch = W / 7, barW = 22;
+  let bars = "";
+  days.forEach((x, i) => {
+    const h = Math.max(x.min > 0 ? 3 : 1.5, (x.min / max) * plotH);
+    const cx = pitch * i + pitch / 2;
+    bars += `<rect x="${cx - barW / 2}" y="${H - bottom - h}" width="${barW}" height="${h}" rx="3"
+      fill="${x.isToday ? "var(--cat-study)" : x.min > 0 ? "var(--cat-study)" : "var(--surface-3)"}" ${!x.isToday && x.min > 0 ? 'opacity=".45"' : ""}/>
+      <text x="${cx}" y="${H - 4}" text-anchor="middle" class="svg-lbl${x.isToday ? " now" : ""}">${x.letter}</text>
+      ${x.min > 0 ? `<text x="${cx}" y="${H - bottom - h - 4}" text-anchor="middle" class="svg-lbl">${x.min}</text>` : ""}`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Focused minutes, last 7 days">
+    <line x1="0" y1="${H - bottom}" x2="${W}" y2="${H - bottom}" stroke="var(--border)"/>${bars}</svg>`;
 }
 function showLevelUp(lvl) {
+  confettiBurst();
   document.getElementById("lvl-overlay")?.remove();
   const o = document.createElement("div");
   o.id = "lvl-overlay";
@@ -1906,7 +2066,8 @@ function completeFocusTimer(away) {
   const after = levelFromXp(S.focus.xp);
   render();
   if (after > before) showLevelUp(after);
-  else toast(`Focus complete — +${xp} XP 🎉${away ? " (finished while you were away)" : ""}`);
+  else { confettiBurst(); toast(`Focus complete — +${xp} XP 🎉${away ? " (finished while you were away)" : ""}`); }
+  checkFocusExtras();
 }
 function focusTickFn() {
   const t = timerState();
@@ -1919,6 +2080,19 @@ function focusTickFn() {
   if (cnt && cnt.textContent !== text) cnt.textContent = text;
   const prog = document.getElementById("focus-prog");
   if (prog) prog.setAttribute("stroke-dasharray", `${Math.min(100, (1 - ms / (t.minutes * 60000)) * 100).toFixed(2)} 100`);
+  const msg = document.getElementById("focus-msg");
+  if (msg) {
+    const m2 = focusPhaseMsg(1 - ms / (t.minutes * 60000), t.paused);
+    if (msg.textContent !== m2) msg.textContent = m2;
+  }
+}
+function focusPhaseMsg(fraction, paused) {
+  if (paused) return "Paused — take a breath 🍃";
+  if (fraction < 0.1) return "Settling in… find your flow";
+  if (fraction < 0.5) return "In the zone 🔍";
+  if (fraction < 0.75) return "Over halfway — hou vol! 💪";
+  if (fraction < 0.92) return "Final stretch…";
+  return "Almost there — finish strong! 🚀";
 }
 /* per-feed event color: stored colorIndex, else a stable hash of the feed name */
 function evColor(e) {
@@ -2638,12 +2812,7 @@ function viewFocus() {
   const d0 = f.days[today] || { minutes: 0, sessions: 0 };
   let totalMin = 0;
   for (const v of Object.values(f.days)) totalMin += v.minutes;
-  let streak = 0;
-  {
-    const c = localMidnight(new Date());
-    if (!(f.days[dateKeyOf(c)]?.sessions > 0)) c.setDate(c.getDate() - 1);
-    while (f.days[dateKeyOf(c)]?.sessions > 0) { streak++; c.setDate(c.getDate() - 1); }
-  }
+  const streak = focusStreak();
   const t = timerState();
   const durs = [10, 15, 25, 30, 45, 60];
   const dur = durs.includes(UI.focusDur) ? UI.focusDur : 30;
@@ -2653,13 +2822,14 @@ function viewFocus() {
     const donePct = Math.min(100, (1 - ms / (t.minutes * 60000)) * 100).toFixed(2);
     timerCard = `<div class="card focus-card">
       ${t.label ? `<div class="focus-label">${esc(t.label)}</div>` : ""}
-      <div class="focus-ringwrap">
+      <div class="focus-ringwrap${t.paused ? "" : " live"}">
         <svg viewBox="0 0 36 36" class="focus-ring" aria-hidden="true">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--surface-3)" stroke-width="2.4"/>
           <circle id="focus-prog" cx="18" cy="18" r="15.9" fill="none" stroke="var(--cat-study)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="${donePct} 100" transform="rotate(-90 18 18)"/>
         </svg>
         <div id="focus-count" class="focus-count">${fmtCountdown(ms)}</div>
       </div>
+      <div id="focus-msg" class="focus-msg">${focusPhaseMsg(donePct / 100, t.paused)}</div>
       <div class="sheet-footer" style="justify-content:center;margin-top:8px">
         ${t.paused ? `<button class="btn btn-primary" data-action="focus-resume">Resume</button>` : `<button class="btn btn-ghost" data-action="focus-pause">Pause</button>`}
         <button class="btn-danger" data-action="focus-giveup">${UI.confirm2 === "giveup" ? "Really give up?" : "Give up"}</button>
@@ -2677,7 +2847,28 @@ function viewFocus() {
     </div>`;
   }
   const recent = (f.recent || []).slice(0, 12);
-  return `<div class="card focus-hero">
+  // daily quest
+  const q = questForDay(today);
+  const [qcRaw, qg] = q.progress(today);
+  const qc = Math.min(qcRaw, qg);
+  const claimed = !!(f.days[today]?.quest);
+  const questProg = qg <= 8
+    ? `<div class="goal-segs" style="margin-top:10px">${Array.from({ length: qg }, (_, i) => `<i class="${(claimed || i < qc) ? "on" : ""}"></i>`).join("")}</div>`
+    : `<div class="xp-bar" style="margin:10px 0 0"><i style="width:${claimed ? 100 : Math.round(100 * qc / qg)}%"></i></div>`;
+  const questCard = `<div class="card quest-card${claimed ? " done" : ""}" style="margin-top:14px">
+    <div style="display:flex;align-items:center;gap:11px">
+      <span class="quest-ico">${claimed ? "✅" : "🎯"}</span>
+      <span style="flex:1;min-width:0"><b style="font-size:13.5px">Daily quest</b><br><span style="font-size:13px;color:var(--text-2)">${esc(q.name)}</span></span>
+      <span class="date-chip" style="background:var(--success-soft);color:var(--success)">+${q.xp} XP${claimed ? " ✓" : ""}</span>
+    </div>
+    ${questProg}
+  </div>`;
+  const gotBadges = f.badges || [];
+  const badgeShelf = `<div class="section-label">Badges · ${gotBadges.length}/${BADGES.length}</div>
+  <div class="card"><div class="badge-shelf">${BADGES.map(b =>
+    `<button class="badge${gotBadges.includes(b.id) ? "" : " locked"}" data-action="badge-info" data-id="${b.id}" aria-label="${esc(b.name)}${gotBadges.includes(b.id) ? ", earned" : ", locked"}">${b.emoji}</button>`).join("")}</div></div>`;
+  return `<div class="home-date" style="margin-bottom:8px">${esc(focusGreeting())}</div>
+  <div class="card focus-hero">
     <div class="lvl-badge">${lvl}</div>
     <div style="flex:1;min-width:0">
       <div class="lvl-rank">${esc(rankForLevel(lvl))}</div>
@@ -2686,12 +2877,16 @@ function viewFocus() {
     </div>
   </div>
   ${timerCard}
+  ${questCard}
   <div class="ring-cards" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
     <div class="ring-card"><span class="focus-stat">${d0.minutes}</span><span class="lbl">min today</span></div>
     <div class="ring-card"><span class="focus-stat">${d0.sessions}</span><span class="lbl">sessions</span></div>
     <div class="ring-card"><span class="focus-stat">${streak}${streak > 0 ? " 🔥" : ""}</span><span class="lbl">day streak</span></div>
     <div class="ring-card"><span class="focus-stat">${(totalMin / 60).toFixed(1)}</span><span class="lbl">total hours</span></div>
   </div>
+  <div class="section-label">Last 7 days</div>
+  <div class="card"><div class="chart-wrap">${focusWeekChart()}</div></div>
+  ${badgeShelf}
   ${recent.length ? `<div class="section-label">Session log</div>
   <div class="card"><div class="rows">${recent.map(s => {
     const dd = new Date(s.at);
@@ -3146,6 +3341,11 @@ const ACTIONS = {
       const ok = dispatch({ t: "habit.delta", habitId: h.id, dateKey: dk, delta: -1 });
       if (ok !== false) awardXp(-2);
     }
+  },
+  "badge-info"(el) {
+    const b = BADGES.find(x => x.id === el.dataset.id); if (!b) return;
+    const got = (S.focus.badges || []).includes(b.id);
+    toast(`${b.emoji} ${b.name} — ${b.desc}${got ? " ✓" : " (locked)"}`);
   },
   "focus-dur"(el) { UI.focusDur = +el.dataset.m; saveUiPrefs(); render(); },
   "focus-start"() {
