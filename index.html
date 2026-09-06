@@ -477,6 +477,7 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .att-add:hover { color: var(--text-2); border-color: var(--text-3); }
 .att-add svg { width: 22px; height: 22px; }
 .summary-preview { white-space: pre-wrap; }
+.md-img { display: block; max-width: 100%; max-height: 280px; border-radius: 8px; margin: 8px 0; background: var(--surface-2); min-height: 44px; object-fit: contain; }
 .lightbox { text-align: center; }
 .lightbox img { max-width: 100%; max-height: 60dvh; border-radius: 10px; background: var(--surface-2); min-height: 80px; }
 
@@ -1957,12 +1958,26 @@ function agendaRowHTML(item) {
   </div>`;
 }
 
-/* markdown-lite: **bold** and *italic* on top of escaped text */
+/* markdown-lite: **bold**, *italic*, and [img:att_x] inline images on top of escaped text */
 function mdLite(text) {
   let h = esc(text);
+  h = h.replace(/\[img:(att_[a-z0-9_]+)\]/g, '<img class="md-img" data-att="$1" alt="">');
   h = h.replace(/\*\*([^\n]+?)\*\*/g, "<b>$1</b>");
   h = h.replace(/(^|\s)\*([^*\n]+?)\*/g, "$1<i>$2</i>");
   return h;
+}
+function inlineImageIds(text) {
+  return new Set((String(text).match(/\[img:(att_[a-z0-9_]+)\]/g) || []).map(m => m.slice(5, -1)));
+}
+function wrapSummarySelection(w) {
+  const ta = document.querySelector("#view textarea[data-summary]");
+  if (!ta) return;
+  const s = ta.selectionStart, e2 = ta.selectionEnd;
+  const sel = ta.value.slice(s, e2) || "text";
+  ta.value = ta.value.slice(0, s) + w + sel + w + ta.value.slice(e2);
+  ta.focus();
+  ta.setSelectionRange(s + w.length, s + w.length + sel.length);
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
 }
 /* attachment thumbnails; owner is a string of data-* attributes for the actions */
 function attRowHTML(ids, owner) {
@@ -2391,11 +2406,12 @@ function summaryBlockHTML(scope, wk, entry, label) {
         <button type="button" class="btn btn-primary" style="min-height:32px;padding:0 16px;font-size:13px" data-action="summary-done">Done</button>
       </div>
       <textarea class="summary-edit" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">\n${esc(text)}</textarea>
-      <div class="hint">Select text and tap <b>B</b> for bold — it shows styled when you tap Done · paste a screenshot to attach it</div>
+      <div class="hint">Ctrl+B bold · Ctrl+I italic · paste a screenshot right where your cursor is — it appears in the note when you tap Done</div>
       ${attRowHTML(images, owner)}`;
   } else {
+    const inline = inlineImageIds(text);
     inner = `<button class="summary-preview${text || images.length ? "" : " empty"}" data-action="summary-edit" ${owner}>${text ? mdLite(text) : (images.length ? "<span style='color:var(--text-3)'>Add text…</span>" : "Add a summary for this week…")}</button>
-      ${attRowHTML(images, owner)}`;
+      ${attRowHTML(images.filter(id => !inline.has(id)), owner)}`;
   }
   const bodyHtml = `<div class="lbl">${label}${scope === "work" ? " · week " + parseWeekKey(wk).week : ""}</div>${inner}`;
   return scope === "work"
@@ -3003,17 +3019,7 @@ const ACTIONS = {
     deleteAttachmentFile(meta);
     closeSheet();
   },
-  "md-wrap"(el) {
-    const ta = document.querySelector("#view textarea[data-summary]");
-    if (!ta) return;
-    const w = el.dataset.wrap;
-    const s = ta.selectionStart, e2 = ta.selectionEnd;
-    const sel = ta.value.slice(s, e2) || "text";
-    ta.value = ta.value.slice(0, s) + w + sel + w + ta.value.slice(e2);
-    ta.focus();
-    ta.setSelectionRange(s + w.length, s + w.length + sel.length);
-    ta.dispatchEvent(new Event("input", { bubbles: true }));
-  },
+  "md-wrap"(el) { wrapSummarySelection(el.dataset.wrap); },
   "ts-delete"(el) {
     const t = findById(S.tasks, el.dataset.id); if (!t) return;
     const copy = { ...t };
@@ -3072,6 +3078,7 @@ const ACTIONS = {
   "summary-edit"(el) {
     flushSummary(); // switching from another open editor keeps its text
     UI.editingSummary = el.dataset.scope + "|" + el.dataset.week;
+    UI.summaryEditH = null; // fresh editor sizes to its content
     render();
     const ta = document.querySelector(`#view textarea[data-summary="${CSS.escape(el.dataset.scope)}"]`);
     if (ta) {
@@ -3518,6 +3525,15 @@ async function handleAttachFile(file) {
       renderSheet(); hydrateThumbs(document.getElementById("sheet-root"));
       toast("Image added ✓");
     } else if (target.kind === "summary" && target.scope && parseWeekKey(target.week || "")) {
+      // drop an inline marker at the cursor so the image lives inside the note
+      const ta = document.querySelector("#view textarea[data-summary]");
+      if (ta && UI.editingSummary === target.scope + "|" + target.week) {
+        const pos = ta.selectionStart ?? ta.value.length;
+        const token = (pos > 0 && ta.value[pos - 1] !== "\n" ? "\n" : "") + "[img:" + id + "]\n";
+        ta.value = ta.value.slice(0, pos) + token + ta.value.slice(pos);
+        ta.setSelectionRange(pos + token.length, pos + token.length);
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       dispatch({ t: "summary.image", weekKey: target.week, scope: target.scope, id, add: true }, { silent: true });
       render();
       toast("Image added ✓");
@@ -3557,6 +3573,10 @@ function closeSummaryEditor() {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && UI.sheet) { closeSheet(); return; }
   if (e.key === "Escape" && UI.editingSummary) { closeSummaryEditor(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && document.activeElement?.matches?.("[data-summary]")) {
+    const k = e.key.toLowerCase();
+    if (k === "b" || k === "i") { e.preventDefault(); wrapSummarySelection(k === "b" ? "**" : "*"); return; }
+  }
   if (e.key === "Tab" && UI.sheet) {
     const root = document.getElementById("sheet-root");
     const f = [...root.querySelectorAll("button, input, textarea, select")].filter(el => !el.disabled && el.offsetParent !== null);
@@ -3613,6 +3633,8 @@ window.addEventListener("hashchange", () => {
 function render() {
   if (conflictLock || !S) return;
   flushSummary();
+  const liveTa = document.querySelector("#view textarea[data-summary]");
+  if (liveTa) UI.summaryEditH = liveTa.offsetHeight; // keep the editor's size across rebuilds
   const sheetRoot = document.getElementById("sheet-root");
   const focusSel = sheetRoot.contains(document.activeElement) ? null : focusSelectorFor(document.activeElement);
   renderShell();
@@ -3621,6 +3643,10 @@ function render() {
   materializeWeek(currentWeekKey());
   if (UI.view === "planner" || UI.view === "habits") materializeWeek(UI.weekKey);
   document.getElementById("view").innerHTML = VIEWS[UI.view]();
+  if (UI.editingSummary && UI.summaryEditH) {
+    const ta = document.getElementById("view").querySelector("textarea[data-summary]");
+    if (ta) ta.style.height = UI.summaryEditH + "px";
+  }
   applyPendingDrafts();
   // Restore keyboard focus to the recreated control so tab position survives
   // re-renders and assistive tech re-announces the control's new state.
