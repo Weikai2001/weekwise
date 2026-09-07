@@ -477,6 +477,12 @@ textarea.text-input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .att-add:hover { color: var(--text-2); border-color: var(--text-3); }
 .att-add svg { width: 22px; height: 22px; }
 .summary-preview { white-space: pre-wrap; }
+.note-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; padding: 9px 12px; border-radius: var(--r-sm); background: var(--surface-2); margin-top: 7px; }
+.note-row:hover { background: var(--surface-3); }
+.note-title { font-size: 13.5px; font-weight: 500; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+.note-meta { font-size: 11.5px; color: var(--text-3); }
+.note-editor { min-height: 50dvh; }
+@media (min-width: 900px) { .sheet-lg { width: min(680px, 94vw); } .note-editor { min-height: 46dvh; } }
 .md-img { display: block; max-width: 100%; max-height: 280px; border-radius: 8px; margin: 8px 0; background: var(--surface-2); min-height: 44px; object-fit: contain; }
 .lightbox { text-align: center; }
 .lightbox img { max-width: 100%; max-height: 60dvh; border-radius: 10px; background: var(--surface-2); min-height: 80px; }
@@ -671,7 +677,7 @@ function nowIso() { return new Date().toISOString(); }
 /* ============================================================
    store — state, dispatch funnel, normalize/migrate, queries
    ============================================================ */
-const CURRENT_SCHEMA = 2;
+const CURRENT_SCHEMA = 3;
 const CATS = ["study", "work", "personal"];
 const CAT_LABEL = { study: "Study", work: "Work", personal: "Personal" };
 const GROUP_NOUN = { study: "course", work: "project" };
@@ -739,10 +745,19 @@ function normalize(d) {
   const cleanWS = {};
   const scanEntry = (entry) => {
     if (!entry || typeof entry !== "object") return null;
-    const e = { text: String(entry.text ?? ""), updatedAt: entry.updatedAt || nowIso() };
-    const ims = Array.isArray(entry.images) ? entry.images.filter(x => typeof x === "string") : [];
-    if (ims.length) e.images = ims;
-    return (e.text.trim() || e.images) ? e : null;
+    const blocks = [];
+    const addBlock = (id, text, images) => {
+      const nb = { id: String(id), text: String(text ?? "") };
+      const ims = Array.isArray(images) ? images.filter(x => typeof x === "string") : [];
+      if (ims.length) nb.images = ims;
+      if (nb.text.trim() || nb.images) blocks.push(nb);
+    };
+    if (Array.isArray(entry.blocks)) {
+      for (const b of entry.blocks) if (b && typeof b === "object" && typeof b.id === "string") addBlock(b.id, b.text, b.images);
+    } else {
+      addBlock("b0", entry.text, entry.images); // legacy single-note shape
+    }
+    return blocks.length ? { blocks, updatedAt: entry.updatedAt || nowIso() } : null;
   };
   for (const [wk, w] of Object.entries(d.weeklySummaries)) {
     if (!parseWeekKey(wk) || !w || typeof w !== "object") continue;
@@ -813,6 +828,9 @@ const MIGRATIONS = {
     for (const c of (Array.isArray(d.courses) ? d.courses : [])) if (c && typeof c === "object" && !c.category) c.category = "study";
     d.schemaVersion = 2;
   },
+  2: (d) => { // v3: summary entries become note-block lists; normalize() converts both shapes
+    d.schemaVersion = 3;
+  },
 };
 function migrate(d) {
   if (typeof d.schemaVersion !== "number") throw new Error("invalid_data");
@@ -823,6 +841,32 @@ function migrate(d) {
 
 /* ---- op application (used by dispatch AND stash replay) ---- */
 function findById(arr, id) { return arr.find(x => x.id === id); }
+function summaryEntryFor(op, create) {
+  const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
+  w.courses ||= {};
+  const isTop = op.scope === "work" || op.scope === "personal";
+  let entry = isTop ? w[op.scope] : w.courses[op.scope];
+  // convert a legacy single-note entry in place
+  if (entry && !Array.isArray(entry.blocks)) {
+    const blocks = [];
+    if (String(entry.text || "").trim() || (entry.images || []).length) {
+      const b0 = { id: "b0", text: String(entry.text || "") };
+      if ((entry.images || []).length) b0.images = entry.images;
+      blocks.push(b0);
+    }
+    entry = { blocks, updatedAt: entry.updatedAt || nowIso() };
+    if (isTop) w[op.scope] = entry; else w.courses[op.scope] = entry;
+  }
+  if (!entry && create) {
+    entry = { blocks: [], updatedAt: nowIso() };
+    if (isTop) w[op.scope] = entry; else w.courses[op.scope] = entry;
+  }
+  return { w, entry, isTop };
+}
+function summaryPrune(weekKey, w, entry, isTop, scope) {
+  if (!entry.blocks.length) { if (isTop) delete w[scope]; else delete w.courses[scope]; }
+  if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[weekKey];
+}
 function apply(op) {
   switch (op.t) {
     case "task.upsert": {
@@ -876,39 +920,41 @@ function apply(op) {
       break;
     }
     case "summary.set": {
-      const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
-      w.courses ||= {};
+      const { w, entry, isTop } = summaryEntryFor(op, true);
       const text = String(op.text ?? "");
-      const isTop = op.scope === "work" || op.scope === "personal";
-      const prev = isTop ? w[op.scope] : w.courses[op.scope];
-      const images = prev && prev.images ? prev.images : null;
-      let entry = null;
-      if (text.trim() || images) {
-        entry = { text, updatedAt: nowIso() };
-        if (images) entry.images = images;
-      }
-      if (isTop) { if (entry) w[op.scope] = entry; else delete w[op.scope]; }
-      else { if (entry) w.courses[op.scope] = entry; else delete w.courses[op.scope]; }
-      if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[op.weekKey];
+      const bid = typeof op.blockId === "string" && op.blockId ? op.blockId : "b0";
+      let block = entry.blocks.find(b => b.id === bid);
+      if (!block) { block = { id: bid, text: "" }; entry.blocks.push(block); }
+      block.text = text;
+      entry.updatedAt = nowIso();
+      if (!text.trim() && !block.images) entry.blocks = entry.blocks.filter(b => b !== block);
+      summaryPrune(op.weekKey, w, entry, isTop, op.scope);
       break;
     }
     case "summary.image": {
-      const w = (S.weeklySummaries[op.weekKey] ||= { courses: {} });
-      w.courses ||= {};
-      const isTop = op.scope === "work" || op.scope === "personal";
-      let entry = isTop ? w[op.scope] : w.courses[op.scope];
-      if (!entry) {
-        entry = { text: "", updatedAt: nowIso() };
-        if (isTop) w[op.scope] = entry; else w.courses[op.scope] = entry;
-      }
-      const ims = (entry.images || []).filter(i => i !== op.id);
+      const { w, entry, isTop } = summaryEntryFor(op, true);
+      const bid = typeof op.blockId === "string" && op.blockId ? op.blockId : "b0";
+      let block = entry.blocks.find(b => b.id === bid);
+      if (!block) { block = { id: bid, text: "" }; entry.blocks.push(block); }
+      const ims = (block.images || []).filter(i => i !== op.id);
       if (op.add) ims.push(op.id);
-      if (ims.length) entry.images = ims; else delete entry.images;
+      if (ims.length) block.images = ims; else delete block.images;
       entry.updatedAt = nowIso();
-      if (!String(entry.text || "").trim() && !entry.images) {
-        if (isTop) delete w[op.scope]; else delete w.courses[op.scope];
-      }
-      if (!Object.keys(w.courses).length && !w.work && !w.personal) delete S.weeklySummaries[op.weekKey];
+      if (!block.text.trim() && !block.images) entry.blocks = entry.blocks.filter(b => b !== block);
+      summaryPrune(op.weekKey, w, entry, isTop, op.scope);
+      break;
+    }
+    case "summary.delBlock": {
+      const w = S.weeklySummaries[op.weekKey];
+      if (!w || typeof w !== "object") return false;
+      const isTop = op.scope === "work" || op.scope === "personal";
+      const entry = isTop ? w[op.scope] : w.courses?.[op.scope];
+      if (!entry || !Array.isArray(entry.blocks)) return false;
+      const i = entry.blocks.findIndex(b => b.id === op.id);
+      if (i < 0) return false;
+      entry.blocks.splice(i, 1);
+      entry.updatedAt = nowIso();
+      summaryPrune(op.weekKey, w, entry, isTop, op.scope);
       break;
     }
     case "att.add": {
@@ -1196,7 +1242,9 @@ function sweepOrphanAttachments() {
     for (const w of Object.values(S.weeklySummaries)) {
       if (!w || typeof w !== "object") continue;
       for (const entry of [...Object.values(w.courses || {}), w.work, w.personal]) {
-        if (entry) for (const id of (entry.images || [])) referenced.add(id);
+        if (!entry) continue;
+        for (const id of (entry.images || [])) referenced.add(id); // legacy shape
+        for (const b of (entry.blocks || [])) for (const id of (b.images || [])) referenced.add(id);
       }
     }
     if (UI.sheet?.params?.draft?.images) for (const id of UI.sheet.params.draft.images) referenced.add(id);
@@ -2158,7 +2206,7 @@ function inlineImageIds(text) {
   return new Set((String(text).match(/\[img:(att_[a-z0-9_]+)\]/g) || []).map(m => m.slice(5, -1)));
 }
 function wrapSummarySelection(w) {
-  const ta = document.querySelector("#view textarea[data-summary]");
+  const ta = document.querySelector("#sheet-root [data-note-editor]");
   if (!ta) return;
   const s = ta.selectionStart, e2 = ta.selectionEnd;
   const sel = ta.value.slice(s, e2) || "text";
@@ -2309,6 +2357,7 @@ function openSheet(kind, params = {}) {
 }
 function closeSheet() {
   if (!UI.sheet) return;
+  flushSummary(); // a closing note sheet persists its last keystrokes
   UI.sheet = null; renderSheet(); render();
   if (UI.sheetOpener) {
     const el = document.querySelector(UI.sheetOpener);
@@ -2324,7 +2373,7 @@ function renderSheet() {
   const body = SHEETS[UI.sheet.kind] ? SHEETS[UI.sheet.kind](UI.sheet.params) : "";
   root.classList.add("open");
   root.innerHTML = `<div class="backdrop" data-action="sheet-close"></div>
-    <div class="sheet" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-grip"></div>${body}</div>`;
+    <div class="sheet${UI.sheet.kind === "note" ? " sheet-lg" : ""}" role="dialog" aria-modal="true" tabindex="-1"><div class="sheet-grip"></div>${body}</div>`;
   const sheetEl = root.querySelector(".sheet");
   const h2 = sheetEl.querySelector("h2");
   if (h2) { h2.id = "sheet-title"; sheetEl.setAttribute("aria-labelledby", "sheet-title"); }
@@ -2579,29 +2628,28 @@ function courseCardHTML(course, tasks, entry, wk, cat) {
     ${course ? summaryBlockHTML(course.id, wk, entry, "Week summary") : ""}
   </div>`;
 }
+function summaryEntryPeek(week, scope) {
+  const w = S.weeklySummaries[week];
+  if (!w) return null;
+  return (scope === "work" || scope === "personal") ? w[scope] : w.courses?.[scope];
+}
 function summaryBlockHTML(scope, wk, entry, label) {
-  const text = entry ? String(entry.text || "") : "";
-  const images = entry && entry.images ? entry.images : [];
-  const editing = UI.editingSummary === scope + "|" + wk;
-  const owner = `data-scope="${esc(scope)}" data-week="${wk}"`;
-  let inner;
-  if (editing) {
-    inner = `<div class="md-tools">
-        <button type="button" data-action="md-wrap" data-wrap="**" aria-label="Bold"><b>B</b></button>
-        <button type="button" data-action="md-wrap" data-wrap="*" aria-label="Italic"><i>I</i></button>
-        <button type="button" data-action="att-add-summary" ${owner} aria-label="Add image">${IC.image}</button>
-        <span style="flex:1"></span>
-        <button type="button" class="btn btn-primary" style="min-height:32px;padding:0 16px;font-size:13px" data-action="summary-done">Done</button>
-      </div>
-      <textarea class="summary-edit" data-summary="${esc(scope)}" data-week="${wk}" data-draft-id="sum:${esc(scope)}|${wk}" placeholder="How did this week go?">\n${esc(text)}</textarea>
-      <div class="hint">Ctrl+B bold · Ctrl+I italic · paste a screenshot right where your cursor is — it appears in the note when you tap Done</div>
-      ${attRowHTML(images, owner)}`;
-  } else {
-    const inline = inlineImageIds(text);
-    inner = `<button class="summary-preview${text || images.length ? "" : " empty"}" data-action="summary-edit" ${owner}>${text ? mdLite(text) : (images.length ? "<span style='color:var(--text-3)'>Add text…</span>" : "Add a summary for this week…")}</button>
-      ${attRowHTML(images.filter(id => !inline.has(id)), owner)}`;
-  }
-  const bodyHtml = `<div class="lbl">${label}${scope === "work" ? " · week " + parseWeekKey(wk).week : ""}</div>${inner}`;
+  const blocks = entry?.blocks || [];
+  const attrs = `data-scope="${esc(scope)}" data-week="${wk}"`;
+  const rows = blocks.map(b => {
+    const clean = String(b.text || "").replace(/\[img:[^\]]*\]/g, "").replace(/\*+/g, "").trim();
+    const first = (clean.split("\n").find(l => l.trim()) || "Note").trim().slice(0, 70);
+    const lines = clean.split("\n").filter(l => l.trim()).length;
+    const imgs = (b.images || []).length;
+    const meta = [lines > 1 ? `${lines} lines` : "", imgs ? `🖼 ${imgs}` : ""].filter(Boolean).join(" · ");
+    return `<button class="note-row" data-action="note-open" ${attrs} data-block="${esc(b.id)}">
+      <span class="note-title">${esc(first)}</span>
+      ${meta ? `<span class="note-meta">${esc(meta)}</span>` : ""}
+    </button>`;
+  }).join("");
+  const bodyHtml = `<div class="lbl">${label}${scope === "work" ? " · week " + parseWeekKey(wk).week : ""}</div>
+    ${rows}
+    <button class="ghost-add" data-action="note-open" ${attrs} data-block="">${IC.plus}<span>Add note</span></button>`;
   return scope === "work"
     ? `<div class="card" style="margin-top:12px"><div class="summary-block" style="border-top:0;margin-top:0;padding-top:0">${bodyHtml}</div></div>`
     : `<div class="summary-block">${bodyHtml}</div>`;
@@ -2978,8 +3026,27 @@ const SHEETS = {
     return `<h2>Image</h2>
     <div class="lightbox"><img data-att="${esc(p.id)}" alt=""></div>
     <div class="sheet-footer">
-      ${p.scope ? `<button class="btn-danger" data-action="att-delete" data-id="${esc(p.id)}" data-scope="${esc(p.scope)}" data-week="${esc(p.week)}">${p.confirm ? "Really delete?" : "Delete"}</button>` : ""}
-      <button class="btn btn-primary" data-action="sheet-close">Close</button>
+      ${p.scope ? `<button class="btn-danger" data-action="att-delete" data-id="${esc(p.id)}" data-scope="${esc(p.scope)}" data-week="${esc(p.week)}" data-block="${esc(p.block || "")}">${p.confirm ? "Really delete?" : "Delete"}</button>` : ""}
+      <button class="btn btn-primary" data-action="${p.backTo ? "image-back" : "sheet-close"}">Close</button>
+    </div>`;
+  },
+  note(p) {
+    const ctxName = p.scope === "work" ? "Week notes" : (p.scope === "personal" ? "Notes" : (courseById(p.scope)?.name || "Note"));
+    const entry = summaryEntryPeek(p.week, p.scope);
+    const block = entry?.blocks?.find(b => b.id === p.blockId);
+    const images = block?.images || [];
+    return `<h2>${esc(ctxName)} · week ${parseWeekKey(p.week).week}</h2>
+    <div class="md-tools">
+      <button type="button" data-action="md-wrap" data-wrap="**" aria-label="Bold"><b>B</b></button>
+      <button type="button" data-action="md-wrap" data-wrap="*" aria-label="Italic"><i>I</i></button>
+      <button type="button" data-action="att-add-note" aria-label="Add image">${IC.image}</button>
+    </div>
+    <textarea class="summary-edit note-editor" data-note-editor placeholder="Write your note…" data-autofocus>\n${esc(p.draft.text)}</textarea>
+    <div class="hint">Ctrl+B bold · Ctrl+I italic · paste a screenshot right where your cursor is</div>
+    ${images.length ? `<div class="att-row">${images.map(id => S.attachments[id] ? `<button type="button" class="att-thumb" data-action="note-att-view" data-id="${esc(id)}"><img data-att="${esc(id)}" alt=""></button>` : "").join("")}</div>` : ""}
+    <div class="sheet-footer">
+      ${block ? `<button class="btn-danger" data-action="note-delete">${p.confirm ? "Really delete?" : "Delete note"}</button>` : ""}
+      <button class="btn btn-primary" data-action="sheet-close">Done</button>
     </div>`;
   },
   courses(p) {
@@ -3119,7 +3186,7 @@ function flushSummary() {
   clearTimeout(summaryTimer);
   const p = summaryPending; summaryPending = null;
   if (mode === "readonly" || mode === "load-error" || futureVersion) return;
-  dispatch({ t: "summary.set", weekKey: p.week, scope: p.scope, text: p.text }, { silent: true });
+  dispatch({ t: "summary.set", weekKey: p.week, scope: p.scope, blockId: p.block || "b0", text: p.text }, { silent: true });
 }
 function currentCW() { return currentWeekKey(); }
 
@@ -3239,10 +3306,11 @@ const ACTIONS = {
     if (!p.confirm) { p.confirm = true; renderSheet(); hydrateThumbs(document.getElementById("sheet-root")); return; }
     const id = el.dataset.id;
     const meta = S.attachments[id];
-    dispatch({ t: "summary.image", weekKey: el.dataset.week, scope: el.dataset.scope, id, add: false }, { silent: true });
+    dispatch({ t: "summary.image", weekKey: el.dataset.week, scope: el.dataset.scope, blockId: el.dataset.block || "b0", id, add: false }, { silent: true });
     dispatch({ t: "att.remove", id }, { silent: true });
     deleteAttachmentFile(meta);
-    closeSheet();
+    if (p.backTo) { openSheet(p.backTo.kind, p.backTo.params); hydrateThumbs(document.getElementById("sheet-root")); }
+    else closeSheet();
   },
   "md-wrap"(el) { wrapSummarySelection(el.dataset.wrap); },
   "ts-delete"(el) {
@@ -3300,19 +3368,49 @@ const ACTIONS = {
     dispatch({ t: "course.delete", id }, { silent: true });
     renderSheet();
   },
-  "summary-edit"(el) {
-    flushSummary(); // switching from another open editor keeps its text
-    UI.editingSummary = el.dataset.scope + "|" + el.dataset.week;
-    UI.summaryEditH = null; // fresh editor sizes to its content
-    render();
-    const ta = document.querySelector(`#view textarea[data-summary="${CSS.escape(el.dataset.scope)}"]`);
-    if (ta) {
-      ta.style.height = Math.max(150, ta.scrollHeight + 4) + "px";
-      ta.focus();
-      ta.setSelectionRange(ta.value.length, ta.value.length);
-    }
+  "note-open"(el) {
+    flushSummary();
+    const scope = el.dataset.scope, week = el.dataset.week;
+    let blockId = el.dataset.block;
+    const entry = summaryEntryPeek(week, scope);
+    const block = blockId ? entry?.blocks?.find(b => b.id === blockId) : null;
+    if (!blockId) blockId = newId("b");
+    openSheet("note", { scope, week, blockId, draft: { text: block?.text || "" } });
+    hydrateThumbs(document.getElementById("sheet-root"));
   },
-  "summary-done"() { closeSummaryEditor(); },
+  "note-delete"() {
+    const p = UI.sheet.params;
+    if (!p.confirm) { p.confirm = true; renderSheet(); hydrateThumbs(document.getElementById("sheet-root")); return; }
+    summaryPending = null; clearTimeout(summaryTimer);
+    const entry = summaryEntryPeek(p.week, p.scope);
+    const block = entry?.blocks?.find(b => b.id === p.blockId);
+    for (const id of (block?.images || [])) {
+      const meta = S.attachments[id];
+      dispatch({ t: "att.remove", id }, { silent: true });
+      deleteAttachmentFile(meta);
+    }
+    dispatch({ t: "summary.delBlock", weekKey: p.week, scope: p.scope, id: p.blockId }, { silent: true });
+    closeSheet();
+    toast("Note deleted");
+  },
+  "att-add-note"() {
+    if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
+    const p = UI.sheet.params;
+    UI.attachTarget = { kind: "note", scope: p.scope, week: p.week, block: p.blockId };
+    document.getElementById("att-file").click();
+  },
+  "note-att-view"(el) {
+    const p = UI.sheet.params;
+    const ta = document.querySelector("#sheet-root [data-note-editor]");
+    if (ta) p.draft.text = ta.value;
+    openSheet("image", { id: el.dataset.id, scope: p.scope, week: p.week, block: p.blockId, backTo: { kind: "note", params: p } });
+    hydrateThumbs(document.getElementById("sheet-root"));
+  },
+  "image-back"() {
+    const back = UI.sheet.params.backTo;
+    if (back) { openSheet(back.kind, back.params); hydrateThumbs(document.getElementById("sheet-root")); }
+    else closeSheet();
+  },
   "cal-mode"(el) {
     if (!["day", "week", "month"].includes(el.dataset.m)) return;
     UI.calMode = el.dataset.m;
@@ -3704,11 +3802,12 @@ document.addEventListener("input", (e) => {
     UI.sheet.params.draft[el.dataset.draftField] = el.value;
   } else if (el.matches("[data-focus-label]")) {
     UI.focusLabel = el.value;
-  } else if (el.matches("[data-summary]")) {
-    summaryPending = { scope: el.dataset.summary, week: el.dataset.week, text: el.value };
+  } else if (el.matches("[data-note-editor]") && UI.sheet?.kind === "note") {
+    const p = UI.sheet.params;
+    p.draft.text = el.value;
+    summaryPending = { scope: p.scope, week: p.week, block: p.blockId, text: el.value };
     clearTimeout(summaryTimer);
     summaryTimer = setTimeout(flushSummary, 600);
-    if (el.scrollHeight > el.clientHeight) el.style.height = (el.scrollHeight + 4) + "px"; // grow with the text
   }
 });
 document.addEventListener("change", (e) => {
@@ -3769,18 +3868,19 @@ async function handleAttachFile(file) {
       (target.draft.images ||= []).push(id);
       renderSheet(); hydrateThumbs(document.getElementById("sheet-root"));
       toast("Image added ✓");
-    } else if (target.kind === "summary" && target.scope && parseWeekKey(target.week || "")) {
+    } else if (target.kind === "note" && UI.sheet?.kind === "note" && UI.sheet.params.blockId === target.block) {
       // drop an inline marker at the cursor so the image lives inside the note
-      const ta = document.querySelector("#view textarea[data-summary]");
-      if (ta && UI.editingSummary === target.scope + "|" + target.week) {
+      const p = UI.sheet.params;
+      const ta = document.querySelector("#sheet-root [data-note-editor]");
+      if (ta) {
         const pos = ta.selectionStart ?? ta.value.length;
         const token = (pos > 0 && ta.value[pos - 1] !== "\n" ? "\n" : "") + "[img:" + id + "]\n";
         ta.value = ta.value.slice(0, pos) + token + ta.value.slice(pos);
-        ta.setSelectionRange(pos + token.length, pos + token.length);
         ta.dispatchEvent(new Event("input", { bubbles: true }));
       }
-      dispatch({ t: "summary.image", weekKey: target.week, scope: target.scope, id, add: true }, { silent: true });
-      render();
+      dispatch({ t: "summary.image", weekKey: target.week, scope: target.scope, blockId: target.block, id, add: true }, { silent: true });
+      renderSheet();
+      hydrateThumbs(document.getElementById("sheet-root"));
       toast("Image added ✓");
     }
     // a mismatched/closed sheet falls through silently: the upload stays as an accepted orphan
@@ -3794,30 +3894,21 @@ document.addEventListener("paste", (e) => {
     if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
     UI.attachTarget = { kind: "tasksheet", draft: UI.sheet.params.draft || null };
     handleAttachFile(file);
-  } else if (UI.editingSummary) {
-    const [scope, week] = UI.editingSummary.split("|");
+  } else if (UI.sheet?.kind === "note") {
     e.preventDefault();
     if (!attachmentsAvailable()) { toast("Connect sync first — images are stored with your synced planner."); return; }
-    UI.attachTarget = { kind: "summary", scope, week };
+    const p = UI.sheet.params;
+    UI.attachTarget = { kind: "note", scope: p.scope, week: p.week, block: p.blockId };
     handleAttachFile(file);
   }
 });
 // keep the summary editor's focus when its toolbar is pressed (a blur would close it)
 document.addEventListener("pointerdown", (e) => {
-  if (e.target.closest && e.target.closest('[data-action="md-wrap"], [data-action="att-add-summary"]')) e.preventDefault();
+  if (e.target.closest && e.target.closest('[data-action="md-wrap"], [data-action="att-add-note"]')) e.preventDefault();
 });
-// The summary editor stays open until the user taps Done (or presses Escape) —
-// losing focus never closes it, so the toolbar, pasting, and stray taps are safe.
-function closeSummaryEditor() {
-  const ta = document.querySelector("#view textarea[data-summary]");
-  if (ta) summaryPending = { scope: ta.dataset.summary, week: ta.dataset.week, text: ta.value };
-  flushSummary();
-  UI.editingSummary = null;
-  render();
-}
+// Notes are edited in the full-screen note sheet; autosave flushes on close.
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && UI.sheet) { closeSheet(); return; }
-  if (e.key === "Escape" && UI.editingSummary) { closeSummaryEditor(); return; }
   if ((e.ctrlKey || e.metaKey) && !e.altKey && document.activeElement?.matches?.("[data-summary]")) {
     const k = e.key.toLowerCase();
     if (k === "b" || k === "i") { e.preventDefault(); wrapSummarySelection(k === "b" ? "**" : "*"); return; }
@@ -3878,8 +3969,6 @@ window.addEventListener("hashchange", () => {
 function render() {
   if (conflictLock || !S) return;
   flushSummary();
-  const liveTa = document.querySelector("#view textarea[data-summary]");
-  if (liveTa) UI.summaryEditH = liveTa.offsetHeight; // keep the editor's size across rebuilds
   const sheetRoot = document.getElementById("sheet-root");
   const focusSel = sheetRoot.contains(document.activeElement) ? null : focusSelectorFor(document.activeElement);
   renderShell();
@@ -3888,10 +3977,6 @@ function render() {
   materializeWeek(currentWeekKey());
   if (UI.view === "planner" || UI.view === "habits") materializeWeek(UI.weekKey);
   document.getElementById("view").innerHTML = VIEWS[UI.view]();
-  if (UI.editingSummary && UI.summaryEditH) {
-    const ta = document.getElementById("view").querySelector("textarea[data-summary]");
-    if (ta) ta.style.height = UI.summaryEditH + "px";
-  }
   applyPendingDrafts();
   // Restore keyboard focus to the recreated control so tab position survives
   // re-renders and assistive tech re-announces the control's new state.
